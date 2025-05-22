@@ -3,7 +3,7 @@ command = "npm run build"
 output_directory = ".next"
 
 [build.environment]
-NODE_VERSION = "18"
+NODE_VERSION = "20"
 
 [site]
 bucket = "./.next"
