@@ -12,10 +12,9 @@ const nextConfig = {
   output: 'export', // Changed from 'standalone' to 'export' for static site generation
   poweredByHeader: false,
   reactStrictMode: true,
-  swcMinify: true,
   compress: true,
   experimental: {
-    optimizeCss: true,
+    // Removed optimizeCss to avoid the critters dependency issue
     optimizePackageImports: ['lucide-react', '@radix-ui/react-icons'],
   },
 }
