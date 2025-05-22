@@ -1,0 +1,19 @@
+name = "final-exam-grade-calculator"
+type = "webpack"
+account_id = ""
+workers_dev = true
+route = ""
+zone_id = ""
+compatibility_date = "2023-06-01"
+
+[site]
+bucket = "./.next"
+entry-point = "./.cloudflare/workers-site"
+
+[build]
+command = "npm run build"
+upload.format = "service-worker"
+
+[env.production]
+name = "final-exam-grade-calculator-prod"
+route = "final-exam-grade-calculator.pages.dev/*"
