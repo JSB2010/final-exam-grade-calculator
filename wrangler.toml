@@ -1,15 +1,6 @@
 name = "final-exam-grade-calculator"
 compatibility_date = "2023-06-01"
+main = ".cloudflare/workers-site/index.js"
 
 # Configuration for Cloudflare Pages
 pages_build_output_dir = ".next"
-
-[build]
-command = "npm run build"
-
-[site]
-bucket = "./.next"
-entry-point = "./.cloudflare/workers-site"
-
-[env.production]
-name = "final-exam-grade-calculator-prod"

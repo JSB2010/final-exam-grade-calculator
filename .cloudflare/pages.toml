@@ -4,11 +4,3 @@ output_directory = ".next"
 
 [build.environment]
 NODE_VERSION = "20"
-
-[site]
-bucket = "./.next"
-entry-point = "./.cloudflare/workers-site"
-
-[env.production]
-name = "production"
-route = "*"

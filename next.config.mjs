@@ -9,7 +9,7 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  output: 'standalone',
+  output: 'export', // Changed from 'standalone' to 'export' for static site generation
   poweredByHeader: false,
   reactStrictMode: true,
   swcMinify: true,
