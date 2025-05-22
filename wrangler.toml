@@ -1,5 +1,0 @@
-name = "final-exam-grade-calculator"
-compatibility_date = "2023-06-01"
-
-# Configuration for Cloudflare Pages
-pages_build_output_dir = "out"

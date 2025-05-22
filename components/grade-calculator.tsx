@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardFooter } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -42,6 +42,8 @@ import {
   Table,
   TrendingUp,
   Award,
+  Check,
+  AlertCircle,
 } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useToast } from "@/hooks/use-toast"
@@ -135,7 +137,7 @@ export default function GradeCalculator() {
     roundToWhole: false,
     showDecimalPlaces: 2,
     darkMode: false,
-    showCredits: true,
+    showCredits: false, // Changed to false by default
   })
 
   const [showAdvanced, setShowAdvanced] = useState(false)
@@ -143,6 +145,7 @@ export default function GradeCalculator() {
   const [selectedClassId, setSelectedClassId] = useState<string | null>(() =>
     classes.length > 0 ? classes[0].id : null,
   )
+  const [insightsLoading, setInsightsLoading] = useState(true)
 
   const gradeBands: GradeBand[] = [
     { label: "A+", cutoff: 97, color: "bg-emerald-500" },
@@ -296,10 +299,15 @@ export default function GradeCalculator() {
     return classes.find((cls) => cls.id === id)
   }
 
+  // Updated to account for rounding when settings.roundToWhole is true
   const calcRequiredRaw = (current: number, weight: number, cutoff: number) => {
     const w = weight / 100
     if (w <= 0) return Number.POSITIVE_INFINITY
-    return (cutoff - 0.5 - (1 - w) * current) / w
+
+    // If rounding is enabled, adjust the cutoff to account for rounding
+    const adjustedCutoff = settings.roundToWhole ? cutoff - 0.5 : cutoff
+
+    return (adjustedCutoff - (1 - w) * current) / w
   }
 
   const getRequiredGrades = (cls: GradeClass) => {
@@ -507,13 +515,36 @@ export default function GradeCalculator() {
         achievableGrades,
       }
     })
-  }, [classes, gradeBands])
+  }, [classes, gradeBands, settings.roundToWhole])
 
   // Calculate final grade based on current grade, weight, and final exam score
   const calculateFinalGrade = (current: number, weight: number, finalScore: number) => {
     const finalGrade = current * (1 - weight / 100) + (finalScore * weight) / 100
     return settings.roundToWhole ? Math.round(finalGrade) : finalGrade
   }
+
+  useEffect(() => {
+    if (activeTab === "insights" && selectedClassId) {
+      // Force a re-render of the charts after a small delay
+      const timer = setTimeout(() => {
+        const event = new Event("resize")
+        window.dispatchEvent(event)
+      }, 100)
+
+      return () => clearTimeout(timer)
+    }
+  }, [activeTab, selectedClassId])
+
+  useEffect(() => {
+    if (activeTab === "insights") {
+      // Force a resize event when switching to insights tab
+      const timer = setTimeout(() => {
+        window.dispatchEvent(new Event("resize"))
+      }, 100)
+
+      return () => clearTimeout(timer)
+    }
+  }, [activeTab])
 
   return (
     <div className="space-y-6">
@@ -803,6 +834,9 @@ export default function GradeCalculator() {
                                     </TooltipTrigger>
                                     <TooltipContent>
                                       <p>Score needed on final exam to achieve target grade</p>
+                                      {settings.roundToWhole && (
+                                        <p className="text-xs mt-1">(Accounts for rounding to nearest whole number)</p>
+                                      )}
                                     </TooltipContent>
                                   </Tooltip>
                                 </TooltipProvider>
@@ -909,7 +943,7 @@ export default function GradeCalculator() {
 
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
               <Card
-                className="flex items-center justify-center p-6 h-full border-dashed cursor:pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+                className="flex items-center justify-center p-6 h-full border-dashed cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
                 onClick={handleAdd}
               >
                 <div className="flex flex-col items-center text-center">
@@ -991,10 +1025,10 @@ export default function GradeCalculator() {
                     </div>
                     <h3 className="text-2xl font-bold mb-1">{getClassById(selectedClassId)?.target || "None"}</h3>
                     <p className="text-sm text-muted-foreground">
-                      {getTargetGrade(getClassById(selectedClassId) as GradeClass)?.required > 100
+                      {getTargetGrade(getClassById(selectedClassId))?.required > 100
                         ? "Not achievable"
                         : `Needs ${formatGrade(
-                            getTargetGrade(getClassById(selectedClassId) as GradeClass)?.required || 0,
+                            getTargetGrade(getClassById(selectedClassId))?.required || 0,
                           )}% on final`}
                     </p>
                   </CardContent>
@@ -1027,56 +1061,104 @@ export default function GradeCalculator() {
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <Card className="shadow-md">
-                  <CardHeader>
+                  <CardHeader className="flex flex-row items-center justify-between">
                     <h3 className="text-lg font-medium">Grade Distribution</h3>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <HelpCircle className="h-4 w-4 text-muted-foreground" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Shows where your current grade falls in the grading scale</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   </CardHeader>
-                  <CardContent>
-                    <GradeDistribution
-                      currentGrade={getClassById(selectedClassId)?.current || 0}
-                      targetGrade={getTargetGrade(getClassById(selectedClassId))}
-                      gradeBands={gradeBands}
-                    />
+                  <CardContent className="pt-0">
+                    <div className="h-[250px]">
+                      <GradeDistribution
+                        currentGrade={getClassById(selectedClassId)?.current || 0}
+                        targetGrade={getTargetGrade(getClassById(selectedClassId))}
+                        gradeBands={gradeBands}
+                      />
+                    </div>
                   </CardContent>
                 </Card>
 
                 <Card className="shadow-md">
-                  <CardHeader>
+                  <CardHeader className="flex flex-row items-center justify-between">
                     <h3 className="text-lg font-medium">Final Exam Impact</h3>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <HelpCircle className="h-4 w-4 text-muted-foreground" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Shows how your final exam score will affect your overall grade</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   </CardHeader>
-                  <CardContent>
-                    <GradeChart
-                      currentGrade={getClassById(selectedClassId)?.current || 0}
-                      finalWeight={getClassById(selectedClassId)?.weight || 0}
-                      gradeBands={gradeBands}
-                    />
+                  <CardContent className="pt-0">
+                    <div className="h-[250px]">
+                      <GradeChart
+                        currentGrade={getClassById(selectedClassId)?.current || 0}
+                        finalWeight={getClassById(selectedClassId)?.weight || 0}
+                        gradeBands={gradeBands}
+                      />
+                    </div>
                   </CardContent>
                 </Card>
 
                 <Card className="shadow-md">
-                  <CardHeader>
+                  <CardHeader className="flex flex-row items-center justify-between">
                     <h3 className="text-lg font-medium">Grade Comparison</h3>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <HelpCircle className="h-4 w-4 text-muted-foreground" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Compares your grades across all classes</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   </CardHeader>
-                  <CardContent>
-                    <GradeComparison
-                      classes={classes}
-                      selectedClassId={selectedClassId}
-                      gradeBands={gradeBands}
-                      formatGrade={formatGrade}
-                    />
+                  <CardContent className="pt-0">
+                    <div className="h-[250px]">
+                      <GradeComparison
+                        classes={classes}
+                        selectedClassId={selectedClassId}
+                        gradeBands={gradeBands}
+                        formatGrade={formatGrade}
+                      />
+                    </div>
                   </CardContent>
                 </Card>
 
                 <Card className="shadow-md">
-                  <CardHeader>
-                    <h3 className="text-lg font-medium">Grade Timeline</h3>
+                  <CardHeader className="flex flex-row items-center justify-between">
+                    <h3 className="text-lg font-medium">Study Timeline</h3>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <HelpCircle className="h-4 w-4 text-muted-foreground" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Recommended study plan to achieve your target grade</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   </CardHeader>
-                  <CardContent>
-                    <GradeTimeline
-                      currentGrade={getClassById(selectedClassId)?.current || 0}
-                      finalWeight={getClassById(selectedClassId)?.weight || 0}
-                      targetGrade={getTargetGrade(getClassById(selectedClassId))}
-                      formatGrade={formatGrade}
-                    />
+                  <CardContent className="pt-0">
+                    <div className="h-[250px]">
+                      <GradeTimeline
+                        currentGrade={getClassById(selectedClassId)?.current || 0}
+                        finalWeight={getClassById(selectedClassId)?.weight || 0}
+                        targetGrade={getTargetGrade(getClassById(selectedClassId))}
+                        formatGrade={formatGrade}
+                      />
+                    </div>
                   </CardContent>
                 </Card>
 
@@ -1231,10 +1313,20 @@ export default function GradeCalculator() {
             <div className="space-y-6">
               <Card className="shadow-md overflow-hidden">
                 <CardHeader className="bg-slate-50 dark:bg-slate-800">
-                  <h3 className="text-lg font-medium">
-                    {selectedClassId ? `${getClassById(selectedClassId)?.name} - ` : ""}
-                    Required Final Exam Scores
-                  </h3>
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-medium">
+                      {selectedClassId && getClassById(selectedClassId)
+                        ? `${getClassById(selectedClassId)?.name} - `
+                        : ""}
+                      Required Final Exam Scores
+                    </h3>
+                    {settings.roundToWhole && (
+                      <Badge variant="outline" className="flex items-center gap-1">
+                        <Check className="w-3 h-3" />
+                        <span className="text-xs">Accounts for rounding</span>
+                      </Badge>
+                    )}
+                  </div>
                 </CardHeader>
                 <CardContent className="p-0">
                   <div className="overflow-x-auto">
@@ -1268,7 +1360,7 @@ export default function GradeCalculator() {
                       </thead>
                       <tbody>
                         {gradeTableData
-                          .filter((cls) => !selectedClassId || cls.id === selectedClassId)
+                          .filter((cls) => selectedClassId === "all" || !selectedClassId || cls.id === selectedClassId)
                           .map((cls) => (
                             <tr key={cls.id} className="border-b hover:bg-slate-50 dark:hover:bg-slate-800/50">
                               <td className="px-4 py-3">
@@ -1313,7 +1405,7 @@ export default function GradeCalculator() {
                   </div>
                 </CardContent>
                 <CardFooter className="bg-slate-50 dark:bg-slate-800 px-4 py-3 text-sm text-muted-foreground">
-                  <div className="flex items-center gap-4">
+                  <div className="flex flex-wrap items-center gap-4">
                     <div className="flex items-center gap-1">
                       <span className="inline-block w-3 h-3 bg-blue-500 rounded-full"></span>
                       <span>Easy (≤70%)</span>
@@ -1337,7 +1429,9 @@ export default function GradeCalculator() {
               <Card className="shadow-md overflow-hidden">
                 <CardHeader className="bg-slate-50 dark:bg-slate-800">
                   <h3 className="text-lg font-medium">
-                    {selectedClassId ? `${getClassById(selectedClassId)?.name} - ` : ""}
+                    {selectedClassId && getClassById(selectedClassId)
+                      ? `${getClassById(selectedClassId)?.name} - `
+                      : ""}
                     Final Grade Outcomes
                   </h3>
                 </CardHeader>
@@ -1388,7 +1482,7 @@ export default function GradeCalculator() {
                       </thead>
                       <tbody>
                         {gradeTableData
-                          .filter((cls) => !selectedClassId || cls.id === selectedClassId)
+                          .filter((cls) => selectedClassId === "all" || !selectedClassId || cls.id === selectedClassId)
                           .map((cls) => (
                             <tr key={cls.id} className="border-b hover:bg-slate-50 dark:hover:bg-slate-800/50">
                               <td className="px-4 py-3">
@@ -1486,7 +1580,7 @@ export default function GradeCalculator() {
                   <div className="space-y-0.5">
                     <Label htmlFor="round-to-whole">Round to Whole Numbers</Label>
                     <p className="text-sm text-muted-foreground">
-                      Display grades as whole numbers (e.g., 89% instead of 89.25%)
+                      Display grades as whole numbers and account for rounding in calculations
                     </p>
                   </div>
                   <Switch
@@ -1494,6 +1588,18 @@ export default function GradeCalculator() {
                     checked={settings.roundToWhole}
                     onCheckedChange={(checked) => setSettings({ ...settings, roundToWhole: checked })}
                   />
+                </div>
+
+                <div className="rounded-md bg-blue-50 dark:bg-blue-950 p-3 flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-blue-500 mt-0.5" />
+                  <div className="text-sm text-blue-700 dark:text-blue-300">
+                    <p className="font-medium">Rounding Enabled</p>
+                    <p className="mt-1">
+                      With rounding enabled, only your final calculated grade will be rounded to the nearest whole
+                      number. For example, a final grade of 96.5% would round up to 97%, meaning you would achieve an
+                      A+.
+                    </p>
+                  </div>
                 </div>
 
                 {!settings.roundToWhole && (
