@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useMemo, useEffect, useCallback } from "react"
+import { useState, useMemo, useEffect, useCallback, useRef } from "react"
 import { Card, CardContent, CardHeader, CardFooter } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -47,6 +47,7 @@ import {
   AlertCircle,
   Dices,
   Share2,
+  FileDown,
 } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useToast } from "@/hooks/use-toast"
@@ -60,6 +61,7 @@ import { ExportDialog } from "@/components/export-dialog"
 import { ShareDialog } from "@/components/share-dialog"
 import { MobileOptimizations, TouchOptimizations } from "@/components/mobile-optimizations"
 import { useLocalStorage } from "@/hooks/use-local-storage"
+import { exportToPdf } from "@/utils/export-utils"
 
 // Define types
 type GradeClass = {
@@ -166,6 +168,7 @@ export default function GradeCalculator() {
   }, [setSettings])
 
   const [showAdvanced, setShowAdvanced] = useState(false)
+  const reportRef = useRef<HTMLDivElement>(null)
   const [activeTab, setActiveTab] = useState("calculator")
   const [selectedClassId, setSelectedClassId] = useState<string | null>(() =>
     classes.length > 0 ? classes[0].id : null,
@@ -530,6 +533,23 @@ export default function GradeCalculator() {
       title: "Data reset",
       description: "All your grade data has been cleared.",
     })
+  }
+
+  const handleDownloadReport = async () => {
+    if (!reportRef.current) return
+    try {
+      await exportToPdf(reportRef.current, {
+        filename: "grade-report.pdf",
+        title: "Grade Report",
+      })
+      toast({ title: "Report ready", description: "PDF downloaded." })
+    } catch (error) {
+      toast({
+        title: "Export failed",
+        description: "Could not generate PDF report.",
+        variant: "destructive",
+      })
+    }
   }
 
   const calculateGPA = () => {
@@ -905,7 +925,7 @@ export default function GradeCalculator() {
 
   return (
     <TouchOptimizations>
-      <div className="space-y-6">
+      <div className="space-y-6" ref={reportRef}>
         <MobileOptimizations />
         <Tabs defaultValue="calculator" value={activeTab} onValueChange={setActiveTab} className="w-full">
         <div className="flex justify-between items-center mb-4">
@@ -1760,6 +1780,11 @@ export default function GradeCalculator() {
                     </Button>
                   }
                 />
+
+                <Button variant="outline" className="flex items-center" onClick={handleDownloadReport}>
+                  <FileDown className="w-4 h-4 mr-2" />
+                  Download Report
+                </Button>
 
                 <Button
                   variant="outline"
