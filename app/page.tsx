@@ -1,7 +1,8 @@
 import { ThemeToggle } from "@/components/theme-toggle"
-import { BookOpen, Calculator, GraduationCap, LineChart, Target, BarChart3, Lightbulb, Smartphone, Share2 } from "lucide-react"
+import { BookOpen, Calculator, GraduationCap, LineChart, Target, BarChart3, Lightbulb, Smartphone } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
+import { UnifiedFooter } from "@/components/unified-footer"
 
 export default function Home() {
   return (
@@ -148,27 +149,7 @@ export default function Home() {
         </section>
       </div>
 
-      <footer className="border-t bg-background/80 backdrop-blur-md py-8">
-        <div className="container mx-auto px-4">
-          <div className="flex flex-col md:flex-row justify-between items-center">
-            <div className="flex items-center gap-2 mb-4 md:mb-0">
-              <GraduationCap className="h-5 w-5 text-primary" />
-              <span className="font-semibold">GradeCalc Pro</span>
-            </div>
-            <div className="flex items-center gap-4">
-              <Link href="/" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-                Home
-              </Link>
-              <Link href="/calculator" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-                Calculator
-              </Link>
-            </div>
-            <p className="text-sm text-muted-foreground mt-4 md:mt-0">
-              © {new Date().getFullYear()} GradeCalc Pro. All rights reserved.
-            </p>
-          </div>
-        </div>
-      </footer>
+      <UnifiedFooter />
     </main>
   )
 }
