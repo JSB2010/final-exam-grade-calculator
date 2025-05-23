@@ -6,7 +6,7 @@
 
 A powerful and intuitive web application that helps students calculate what they need on their final exams to achieve their target grades. This tool provides comprehensive grade analysis, visualizations, and advanced what-if scenarios to help students plan their study strategies effectively. Now featuring enhanced analytics, mobile optimization, and intelligent user guidance.
 
-![Grade Calculator Screenshot](public/placeholder.jpg)
+![Grade Calculator Screenshot](public/website_scrnsht.png)
 
 ## 🌟 Features
 
