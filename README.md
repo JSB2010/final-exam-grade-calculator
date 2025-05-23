@@ -4,20 +4,35 @@
 [![Styled with Tailwind CSS](https://img.shields.io/badge/Styled%20with-Tailwind%20CSS-38B2AC?style=for-the-badge&logo=tailwind-css)](https://tailwindcss.com/)
 [![Deployed on Cloudflare Pages](https://img.shields.io/badge/Deployed%20on-Cloudflare%20Pages-F38020?style=for-the-badge&logo=cloudflare)](https://pages.cloudflare.com/)
 
-A powerful and intuitive web application that helps students calculate what they need on their final exams to achieve their target grades. This tool provides comprehensive grade analysis, visualizations, and what-if scenarios to help students plan their study strategies effectively.
+A powerful and intuitive web application that helps students calculate what they need on their final exams to achieve their target grades. This tool provides comprehensive grade analysis, visualizations, and advanced what-if scenarios to help students plan their study strategies effectively. Now featuring enhanced analytics, mobile optimization, and intelligent user guidance.
 
 ![Grade Calculator Screenshot](public/placeholder.jpg)
 
 ## 🌟 Features
 
-- **Grade Calculation**: Calculate the minimum score needed on final exams to achieve target grades
-- **Multiple Classes**: Track and manage grades for multiple courses simultaneously
+### Core Functionality
+- **Precise Grade Calculation**: Calculate the minimum score needed on final exams to achieve target grades
+- **Multiple Classes**: Track and manage grades for multiple courses simultaneously with color coding
+- **Smart Rounding**: Optional rounding for final grades while maintaining calculation accuracy
+- **Assignment Tracking**: Detailed assignment management with weights and scores
+
+### Advanced Analytics
 - **Visual Analytics**: Interactive charts and graphs to visualize grade distributions and scenarios
-- **What-If Scenarios**: See how different final exam scores would affect your overall grade
-- **GPA Calculation**: Automatic GPA calculation based on current grades and credits
+- **Enhanced What-If Scenarios**:
+  - Target Achievement Analysis with difficulty indicators
+  - Grade Improvement Scenarios
+  - Risk Assessment for different performance levels
+  - Dual input controls (sliders + numerical inputs for precision)
+- **Comprehensive Statistics**: Statistical analysis with user-friendly explanations
+- **Grade Comparison**: Cross-class performance analysis and trends
+
+### User Experience
+- **Intuitive Interface**: Educational explanations and contextual help throughout the app
+- **Page Synchronization**: Smart navigation that remembers your context between pages
 - **Data Import/Export**: Save and load your grade data with JSON export/import functionality
-- **Responsive Design**: Works seamlessly on desktop, tablet, and mobile devices
-- **Dark Mode Support**: Toggle between light and dark themes for comfortable viewing
+- **Responsive Design**: Works seamlessly on desktop, tablet, and mobile devices with touch optimizations
+- **PWA Support**: Install as a native app with offline functionality
+- **Dark Mode Support**: Toggle between light and dark themes with system preference detection
 - **Local Storage**: Your data is saved locally in your browser for privacy and convenience
 
 ## 🚀 Technologies Used
@@ -97,6 +112,22 @@ Where:
 - **Current Grade**: Your current grade before the final exam
 - **Final Weight**: The percentage weight of the final exam in your overall grade
 
+## 🆕 Recent Improvements
+
+### Version 2.0 Features
+- **Enhanced What-If Scenarios**: Added contextual explanations, difficulty indicators, and dual input controls
+- **Improved Statistics**: User-friendly language and comprehensive explanations for all metrics
+- **Page Synchronization**: Smart navigation that remembers your context between insights and tables
+- **Mobile Optimization**: Better touch interactions and responsive design improvements
+- **UI/UX Polish**: Consistent styling, better visual hierarchy, and professional appearance
+- **Code Quality**: Resolved all linting issues and improved performance
+
+### Bug Fixes
+- Fixed hydration errors for better SSR compatibility
+- Resolved card overflow issues in insights page
+- Corrected rounding functionality to only affect final grades
+- Improved responsive layout for equal-height cards
+
 ## 🚢 Deployment
 
 ### Deploying to Cloudflare Pages
@@ -126,6 +157,12 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 3. Commit your changes (`git commit -m 'Add some amazing feature'`)
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
+
+## 👨‍💻 Author
+
+**Jacob Barkin**
+- Website: [jacobbarkin.com](https://jacobbarkin.com)
+- GitHub: [@JSB2010](https://github.com/JSB2010)
 
 ## 📝 License
 

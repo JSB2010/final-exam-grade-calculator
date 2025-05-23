@@ -15,6 +15,8 @@ export function ThemeToggle() {
   }, [])
 
   useEffect(() => {
+    if (!mounted) return;
+
     const root = window.document.documentElement
     root.classList.remove("light", "dark")
 
@@ -24,10 +26,11 @@ export function ThemeToggle() {
     } else {
       root.classList.add(theme)
     }
-  }, [theme])
+  }, [theme, mounted])
 
+  // During SSR and hydration, render a placeholder with the same dimensions
   if (!mounted) {
-    return null
+    return <div className="w-9 h-9" />
   }
 
   return (

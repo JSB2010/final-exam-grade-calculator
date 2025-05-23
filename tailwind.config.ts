@@ -91,6 +91,18 @@ const config: Config = {
   		}
   	}
   },
-  plugins: [require("tailwindcss-animate")],
+  plugins: [
+    require("tailwindcss-animate"),
+    function({ addUtilities, matchUtilities, theme }) {
+      addUtilities({
+        '.bg-grid-slate-200-50': {
+          'background-image': 'linear-gradient(to right, rgba(226, 232, 240, 0.5) 1px, transparent 1px), linear-gradient(to bottom, rgba(226, 232, 240, 0.5) 1px, transparent 1px)'
+        },
+        '.bg-grid-slate-800-20': {
+          'background-image': 'linear-gradient(to right, rgba(30, 41, 59, 0.2) 1px, transparent 1px), linear-gradient(to bottom, rgba(30, 41, 59, 0.2) 1px, transparent 1px)'
+        },
+      });
+    },
+  ],
 };
 export default config;

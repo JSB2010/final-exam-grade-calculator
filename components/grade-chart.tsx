@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Label } from "@/components/ui/label"
 
 type GradeBand = {
@@ -15,10 +15,19 @@ type GradeChartProps = {
   gradeBands: GradeBand[]
 }
 
-export default function GradeChart({ currentGrade, finalWeight, gradeBands }: GradeChartProps) {
+export default function GradeChart({ currentGrade, finalWeight, gradeBands }: Readonly<GradeChartProps>) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const [mounted, setMounted] = useState(false)
+
+  // Handle mounting to avoid hydration issues
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   useEffect(() => {
+    // Skip rendering during server-side rendering
+    if (typeof window === 'undefined' || !mounted) return
+
     const canvas = canvasRef.current
     if (!canvas) return
 
@@ -212,7 +221,33 @@ export default function GradeChart({ currentGrade, finalWeight, gradeBands }: Gr
       resizeObserver.disconnect()
       window.removeEventListener("resize", handleResize)
     }
-  }, [currentGrade, finalWeight, gradeBands])
+  }, [currentGrade, finalWeight, gradeBands, mounted])
+
+  // Show a placeholder during SSR and hydration
+  if (!mounted) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <Label className="text-sm text-muted-foreground">Current Grade: {currentGrade.toFixed(1)}%</Label>
+          </div>
+          <div>
+            <Label className="text-sm text-muted-foreground">Final Weight: {finalWeight.toFixed(1)}%</Label>
+          </div>
+        </div>
+
+        <div className="relative w-full h-[250px] bg-muted/20 animate-pulse rounded-md flex items-center justify-center">
+          <p className="text-muted-foreground">Loading chart...</p>
+        </div>
+
+        <div className="text-sm text-muted-foreground">
+          <p>
+            This chart shows how your final exam score will impact your overall grade.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">

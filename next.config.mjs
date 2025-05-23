@@ -15,6 +15,10 @@ const nextConfig = {
   experimental: {
     optimizePackageImports: ['lucide-react', '@radix-ui/react-icons'],
   },
+  // Add this to help with hydration issues
+  compiler: {
+    styledComponents: true,
+  },
 }
 
 export default nextConfig

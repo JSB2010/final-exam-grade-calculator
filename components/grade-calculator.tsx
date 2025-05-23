@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useMemo, useEffect } from "react"
+import { useState, useMemo, useEffect, useCallback } from "react"
 import { Card, CardContent, CardHeader, CardFooter } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -23,7 +23,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+// Tooltips removed to fix infinite update loop
+// import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import {
   BookOpen,
   X,
@@ -44,14 +45,20 @@ import {
   Award,
   Check,
   AlertCircle,
+  Dices,
+  Share2,
 } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
 import GradeChart from "@/components/grade-chart"
 import GradeDistribution from "@/components/grade-distribution"
-import GradeTimeline from "@/components/grade-timeline"
 import GradeComparison from "@/components/grade-comparison"
+import EnhancedWhatIf from "@/components/enhanced-what-if"
+import GradeStatistics from "@/components/grade-statistics"
+import { ExportDialog } from "@/components/export-dialog"
+import { ShareDialog } from "@/components/share-dialog"
+import { MobileOptimizations, TouchOptimizations } from "@/components/mobile-optimizations"
 import { useLocalStorage } from "@/hooks/use-local-storage"
 
 // Define types
@@ -86,6 +93,11 @@ type AppSettings = {
   showDecimalPlaces: number
   darkMode: boolean
   showCredits: boolean
+  customGradeBands?: boolean
+  gradingSystem?: "letter" | "percentage" | "gpa"
+  theme?: "light" | "dark" | "system"
+  studyReminderEnabled?: boolean
+  autoSaveEnabled?: boolean
 }
 
 export default function GradeCalculator() {
@@ -134,18 +146,60 @@ export default function GradeCalculator() {
   ])
 
   const [settings, setSettings] = useLocalStorage<AppSettings>("grade-calculator-settings", {
-    roundToWhole: false,
+    roundToWhole: true,
     showDecimalPlaces: 2,
     darkMode: false,
-    showCredits: false, // Changed to false by default
+    showCredits: false,
+    customGradeBands: false,
+    gradingSystem: "letter",
+    theme: "system",
+    studyReminderEnabled: false,
+    autoSaveEnabled: true
   })
+
+  // Create a memoized function to update settings to prevent unnecessary re-renders
+  const updateSettings = useCallback((newSettings: Partial<AppSettings>) => {
+    setSettings(prevSettings => ({
+      ...prevSettings,
+      ...newSettings
+    }))
+  }, [setSettings])
 
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [activeTab, setActiveTab] = useState("calculator")
   const [selectedClassId, setSelectedClassId] = useState<string | null>(() =>
     classes.length > 0 ? classes[0].id : null,
   )
-  const [insightsLoading, setInsightsLoading] = useState(true)
+  const [lastInsightsClassId, setLastInsightsClassId] = useState<string | null>(null)
+
+  // Custom function to handle class selection with synchronization
+  const handleClassSelection = (classId: string | null) => {
+    setSelectedClassId(classId)
+
+    // If we're on insights tab and selecting a specific class, remember it
+    if (activeTab === "insights" && classId && classId !== "all") {
+      setLastInsightsClassId(classId)
+    }
+  }
+
+  // Effect to handle tab switching and class synchronization
+  useEffect(() => {
+    if (activeTab === "insights") {
+      // When switching to insights, restore the last insights class if available
+      if (lastInsightsClassId && classes.find(cls => cls.id === lastInsightsClassId)) {
+        setSelectedClassId(lastInsightsClassId)
+      } else if (selectedClassId === "all" && classes.length > 0) {
+        // If coming from "all" in tables, keep the first available class
+        setSelectedClassId(classes[0].id)
+      }
+    } else if (activeTab === "tables") {
+      // When switching to tables, if we have a specific class selected, keep it
+      // If no class is selected, default to "all"
+      if (!selectedClassId && classes.length > 0) {
+        setSelectedClassId("all")
+      }
+    }
+  }, [activeTab, classes, lastInsightsClassId, selectedClassId])
 
   const gradeBands: GradeBand[] = [
     { label: "A+", cutoff: 97, color: "bg-emerald-500" },
@@ -182,10 +236,80 @@ export default function GradeCalculator() {
   }
 
   const formatGrade = (grade: number): string => {
+    return grade.toFixed(settings.showDecimalPlaces)
+  }
+
+  // Special function for formatting final grades that applies rounding
+  const formatFinalGrade = (grade: number): string => {
     if (settings.roundToWhole) {
       return Math.round(grade).toString()
     }
     return grade.toFixed(settings.showDecimalPlaces)
+  }
+
+  // Helper function to get color class based on grade band
+  const getBandColorClass = (bandLabel: string): string => {
+    if (bandLabel.startsWith("A")) return "text-emerald-600 dark:text-emerald-400"
+    if (bandLabel.startsWith("B")) return "text-green-600 dark:text-green-400"
+    if (bandLabel.startsWith("C")) return "text-amber-600 dark:text-amber-400"
+    if (bandLabel.startsWith("D")) return "text-orange-600 dark:text-orange-400"
+    return "text-red-600 dark:text-red-400"
+  }
+
+  // Helper function to get background color class based on grade band
+  const getBandBgColorClass = (bandLabel: string): string => {
+    if (bandLabel.startsWith("A")) return "bg-emerald-500"
+    if (bandLabel.startsWith("B")) return "bg-green-500"
+    if (bandLabel.startsWith("C")) return "bg-amber-500"
+    if (bandLabel.startsWith("D")) return "bg-orange-500"
+    return "bg-red-500"
+  }
+
+  // Helper function to get color class based on final score
+  const getFinalScoreColorClass = (score: number): string => {
+    if (score === 100) return "bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300"
+    if (score >= 80) return "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
+    if (score >= 60) return "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300"
+    return "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300"
+  }
+
+  // Helper function to get border color class based on final score
+  const getFinalScoreBorderClass = (score: number): string => {
+    if (score === 100) return "border-l-4 border-l-emerald-500"
+    if (score >= 80) return "border-l-4 border-l-green-500"
+    if (score >= 60) return "border-l-4 border-l-amber-500"
+    return "border-l-4 border-l-red-500"
+  }
+
+  // Helper function to get target badge class
+  const getTargetBadgeClass = (required: number): string => {
+    if (required > 100) return "bg-red-500"
+    if (required > 90) return "bg-amber-500"
+    if (required > 70) return "bg-green-500"
+    if (required === 0) return "bg-emerald-500"
+    return "bg-blue-500"
+  }
+
+  // Helper function to get target badge text
+  const getTargetBadgeText = (required: number): string => {
+    if (required > 100) return "Impossible"
+    if (required === 0) return "Already achieved"
+    return `${formatGrade(required)}%`
+  }
+
+  // Helper function to get achievable class
+  const getAchievableClass = (achievable: any): string => {
+    if (!achievable) return "text-red-500"
+    if (achievable.required > 90) return "text-amber-500 font-medium"
+    if (achievable.required > 70) return "text-green-500 font-medium"
+    return "text-blue-500 font-medium"
+  }
+
+  // Helper function to get achievable text
+  const getAchievableText = (achievable: any): string => {
+    if (!achievable) return "—"
+    if (achievable.required === 0) return "✓"
+    return `${formatGrade(achievable.required)}%`
   }
 
   const parseGrade = (value: string): number => {
@@ -334,9 +458,9 @@ export default function GradeCalculator() {
   }
 
   const getCurrentGradeBand = (grade: number) => {
-    for (let i = 0; i < gradeBands.length; i++) {
-      if (grade >= gradeBands[i].cutoff) {
-        return gradeBands[i]
+    for (const band of gradeBands) {
+      if (grade >= band.cutoff) {
+        return band
       }
     }
     return gradeBands[gradeBands.length - 1] // F
@@ -458,7 +582,6 @@ export default function GradeCalculator() {
 
   const getGradeStatus = (cls: GradeClass) => {
     const targetBand = gradeBands.find((band) => band.label === cls.target)
-    const currentBand = getCurrentGradeBand(cls.current)
 
     if (!targetBand) return "unknown"
 
@@ -493,6 +616,240 @@ export default function GradeCalculator() {
     }
   }
 
+  const getTargetRequirementText = (cls: GradeClass | null) => {
+    if (!cls) return "No class selected"
+    const targetGrade = getTargetGrade(cls)
+    if (!targetGrade) return "No target set"
+
+    if (targetGrade.required > 100) {
+      return "Not achievable"
+    }
+    return `Needs ${formatGrade(targetGrade.required)}% on final`
+  }
+
+  const renderInsightsContent = () => {
+    if (classes.length === 0) {
+      return (
+        <Card className="p-8 text-center">
+          <div className="flex flex-col items-center">
+            <BookOpen className="h-12 w-12 text-slate-300 mb-4" />
+            <h3 className="text-lg font-medium mb-2">No Classes Added</h3>
+            <p className="text-muted-foreground mb-4">Add your first class to start tracking your grades</p>
+            <Button onClick={() => setActiveTab("calculator")} className="flex items-center">
+              <Plus className="w-4 h-4 mr-2" />
+              Add Your First Class
+            </Button>
+          </div>
+        </Card>
+      )
+    }
+
+    if (!selectedClassId) {
+      return (
+        <Card className="p-8 text-center">
+          <div className="flex flex-col items-center">
+            <Target className="h-12 w-12 text-slate-300 mb-4" />
+            <h3 className="text-lg font-medium mb-2">Select a Class</h3>
+            <p className="text-muted-foreground">Choose a class from the dropdown to view detailed insights</p>
+          </div>
+        </Card>
+      )
+    }
+
+    return (
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card className="bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 shadow-md">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-3 rounded-full bg-blue-100 dark:bg-blue-900">
+                  <Award className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                </div>
+                <Badge variant="outline" className="font-medium">
+                  Current
+                </Badge>
+              </div>
+              <h3 className="text-2xl font-bold mb-1 truncate">
+                {formatGrade(getClassById(selectedClassId)?.current ?? 0)}%
+              </h3>
+              <p className="text-sm text-muted-foreground truncate">
+                {getCurrentGradeBand(getClassById(selectedClassId)?.current ?? 0).label} standing
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 shadow-md">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-3 rounded-full bg-amber-100 dark:bg-amber-900">
+                  <Target className="h-6 w-6 text-amber-600 dark:text-amber-400" />
+                </div>
+                <Badge variant="outline" className="font-medium">
+                  Target
+                </Badge>
+              </div>
+              <h3 className="text-2xl font-bold mb-1 truncate">{getClassById(selectedClassId)?.target ?? "None"}</h3>
+              <p className="text-sm text-muted-foreground truncate">
+                {getTargetRequirementText(getClassById(selectedClassId))}
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 shadow-md">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-3 rounded-full bg-green-100 dark:bg-green-900">
+                  <TrendingUp className="h-6 w-6 text-green-600 dark:text-green-400" />
+                </div>
+                <Badge variant="outline" className="font-medium">
+                  Potential
+                </Badge>
+              </div>
+              <h3 className="text-2xl font-bold mb-1 truncate">
+                {formatFinalGrade(
+                  calculateFinalGrade(
+                    getClassById(selectedClassId)?.current ?? 0,
+                    getClassById(selectedClassId)?.weight ?? 0,
+                    100,
+                  ),
+                )}
+                %
+              </h3>
+              <p className="text-sm text-muted-foreground truncate">Maximum possible final grade</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="space-y-6">
+          {/* Charts Grid - Responsive with equal heights */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <Card className="shadow-md overflow-hidden flex flex-col">
+              <CardHeader className="flex flex-row items-center justify-between flex-shrink-0">
+                <h3 className="text-lg font-medium">Grade Distribution</h3>
+                <HelpCircle className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent className="pt-0 pb-4 flex-1 flex flex-col">
+                <div className="flex-1 min-h-[280px] w-full overflow-hidden">
+                  <GradeDistribution
+                    currentGrade={getClassById(selectedClassId)?.current ?? 0}
+                    targetGrade={getTargetGrade(getClassById(selectedClassId))}
+                    gradeBands={gradeBands}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="shadow-md overflow-hidden flex flex-col">
+              <CardHeader className="flex flex-row items-center justify-between flex-shrink-0">
+                <h3 className="text-lg font-medium">Final Exam Impact</h3>
+                <HelpCircle className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent className="pt-0 pb-4 flex-1 flex flex-col">
+                <div className="flex-1 min-h-[280px] w-full overflow-hidden">
+                  <GradeChart
+                    currentGrade={getClassById(selectedClassId)?.current ?? 0}
+                    finalWeight={getClassById(selectedClassId)?.weight ?? 0}
+                    gradeBands={gradeBands}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="shadow-md overflow-hidden flex flex-col">
+              <CardHeader className="flex flex-row items-center justify-between flex-shrink-0">
+                <h3 className="text-lg font-medium">Grade Comparison</h3>
+                <HelpCircle className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent className="pt-0 pb-4 flex-1 flex flex-col">
+                <div className="flex-1 min-h-[280px] w-full overflow-hidden">
+                  <GradeComparison
+                    classes={classes}
+                    selectedClassId={selectedClassId}
+                    gradeBands={gradeBands}
+                    formatGrade={formatGrade}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* What-If Scenarios */}
+          <Card className="shadow-md">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <h3 className="text-lg font-medium">What-If Scenarios</h3>
+              <HelpCircle className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {[100, 90, 80, 70, 60, 0].map((finalScore) => {
+                  const cls = getClassById(selectedClassId) as GradeClass
+                  if (!cls) return null
+
+                  const finalGrade = calculateFinalGrade(cls.current, cls.weight, finalScore)
+                  const letterGrade = getCurrentGradeBand(finalGrade)
+
+                  return (
+                    <Card
+                      key={finalScore}
+                      className={cn(
+                        "overflow-hidden transition-all hover:shadow-md",
+                        getFinalScoreBorderClass(finalScore),
+                      )}
+                    >
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              "font-medium",
+                              getFinalScoreColorClass(finalScore),
+                            )}
+                          >
+                            {finalScore}% on Final
+                          </Badge>
+                          <Badge
+                            className={cn(
+                              getBandBgColorClass(letterGrade.label),
+                            )}
+                          >
+                            {letterGrade.label}
+                          </Badge>
+                        </div>
+                        <div className="text-center py-2">
+                          <div className="text-3xl font-bold mb-1 truncate">{formatFinalGrade(finalGrade)}%</div>
+                          <div className="text-sm text-muted-foreground">Final grade</div>
+                        </div>
+                        <div className="text-xs text-muted-foreground mt-2">
+                          <div className="flex justify-between">
+                            <span className="truncate">Current: {formatGrade(cls.current)}%</span>
+                            <span className="truncate">Final weight: {formatGrade(cls.weight)}%</span>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="flex justify-center mt-4">
+          <Button
+            variant="outline"
+            onClick={() => {
+              setActiveTab("tables")
+            }}
+            className="flex items-center"
+          >
+            <Table className="w-4 h-4 mr-2" />
+            View Detailed Grade Tables
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
   // Generate grade table data for all classes
   const gradeTableData = useMemo(() => {
     return classes.map((cls) => {
@@ -519,38 +876,40 @@ export default function GradeCalculator() {
 
   // Calculate final grade based on current grade, weight, and final exam score
   const calculateFinalGrade = (current: number, weight: number, finalScore: number) => {
-    const finalGrade = current * (1 - weight / 100) + (finalScore * weight) / 100
-    return settings.roundToWhole ? Math.round(finalGrade) : finalGrade
+    return current * (1 - weight / 100) + (finalScore * weight) / 100
   }
 
+  // Single useEffect to handle resize events for charts
   useEffect(() => {
-    if (activeTab === "insights" && selectedClassId) {
-      // Force a re-render of the charts after a small delay
-      const timer = setTimeout(() => {
-        const event = new Event("resize")
-        window.dispatchEvent(event)
-      }, 100)
+    // Skip during server-side rendering
+    if (typeof window === 'undefined') return
 
-      return () => clearTimeout(timer)
+    // Only trigger resize when on insights tab
+    if (activeTab === "insights") {
+      // Use a ref to track if we've already dispatched an event
+      let hasDispatched = false;
+
+      const timer = setTimeout(() => {
+        if (!hasDispatched) {
+          const event = new Event("resize")
+          window.dispatchEvent(event)
+          hasDispatched = true;
+        }
+      }, 200)
+
+      return () => {
+        clearTimeout(timer)
+      }
     }
   }, [activeTab, selectedClassId])
 
-  useEffect(() => {
-    if (activeTab === "insights") {
-      // Force a resize event when switching to insights tab
-      const timer = setTimeout(() => {
-        window.dispatchEvent(new Event("resize"))
-      }, 100)
-
-      return () => clearTimeout(timer)
-    }
-  }, [activeTab])
-
   return (
-    <div className="space-y-6">
-      <Tabs defaultValue="calculator" value={activeTab} onValueChange={setActiveTab} className="w-full">
+    <TouchOptimizations>
+      <div className="space-y-6">
+        <MobileOptimizations />
+        <Tabs defaultValue="calculator" value={activeTab} onValueChange={setActiveTab} className="w-full">
         <div className="flex justify-between items-center mb-4">
-          <TabsList className="grid grid-cols-4 w-auto">
+          <TabsList className="grid grid-cols-6 w-auto">
             <TabsTrigger value="calculator" className="flex items-center gap-1">
               <Calculator className="w-4 h-4" />
               <span className="hidden sm:inline">Calculator</span>
@@ -563,6 +922,14 @@ export default function GradeCalculator() {
               <Table className="w-4 h-4" />
               <span className="hidden sm:inline">Tables</span>
             </TabsTrigger>
+            <TabsTrigger value="what-if" className="flex items-center gap-1">
+              <Dices className="w-4 h-4" />
+              <span className="hidden sm:inline">What-If</span>
+            </TabsTrigger>
+            <TabsTrigger value="statistics" className="flex items-center gap-1">
+              <BarChart4 className="w-4 h-4" />
+              <span className="hidden sm:inline">Statistics</span>
+            </TabsTrigger>
             <TabsTrigger value="settings" className="flex items-center gap-1">
               <Settings className="w-4 h-4" />
               <span className="hidden sm:inline">Settings</span>
@@ -570,39 +937,35 @@ export default function GradeCalculator() {
           </TabsList>
 
           <div className="flex gap-2">
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="outline" size="sm" onClick={exportData} className="hidden sm:flex">
-                    <Download className="w-4 h-4 mr-1" />
-                    Export
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Export your grade data</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            <ExportDialog
+              data={{ classes, settings }}
+              trigger={
+                <Button variant="outline" size="sm" className="hidden sm:flex">
+                  <Download className="w-4 h-4 mr-1" />
+                  Export
+                </Button>
+              }
+            />
+            <ShareDialog
+              data={{ classes, settings }}
+              trigger={
+                <Button variant="outline" size="sm" className="hidden sm:flex">
+                  <Share2 className="w-4 h-4 mr-1" />
+                  Share
+                </Button>
+              }
+            />
 
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => document.getElementById("import-file")?.click()}
-                    className="hidden sm:flex"
-                  >
-                    <Upload className="w-4 h-4 mr-1" />
-                    Import
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Import your grade data</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-            <input id="import-file" type="file" accept=".json" onChange={importData} className="hidden" />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => document.getElementById("import-file")?.click()}
+              className="hidden sm:flex"
+            >
+              <Upload className="w-4 h-4 mr-1" />
+              Import
+            </Button>
+            <input id="import-file" type="file" accept=".json" onChange={importData} className="hidden" aria-label="Import grade data" title="Import grade data" />
 
             <AlertDialog>
               <AlertDialogTrigger asChild>
@@ -636,7 +999,11 @@ export default function GradeCalculator() {
               </Badge>
             </div>
             <div className="flex items-center gap-2">
-              <Switch id="advanced-mode" checked={showAdvanced} onCheckedChange={setShowAdvanced} />
+              <Switch
+                id="advanced-mode"
+                checked={showAdvanced}
+                onCheckedChange={setShowAdvanced}
+              />
               <Label htmlFor="advanced-mode" className="text-sm cursor-pointer">
                 Advanced Mode
               </Label>
@@ -791,7 +1158,7 @@ export default function GradeCalculator() {
                                 min="0"
                                 max="10"
                                 step="1"
-                                value={cls.credits || 0}
+                                value={cls.credits ?? 0}
                                 onChange={(e) => handleCreditsChange(cls.id, e.target.value)}
                                 className="h-8"
                               />
@@ -808,15 +1175,7 @@ export default function GradeCalculator() {
                               variant="outline"
                               className={cn(
                                 "font-medium",
-                                currentBand.label.startsWith("A")
-                                  ? "text-emerald-600 dark:text-emerald-400"
-                                  : currentBand.label.startsWith("B")
-                                    ? "text-green-600 dark:text-green-400"
-                                    : currentBand.label.startsWith("C")
-                                      ? "text-amber-600 dark:text-amber-400"
-                                      : currentBand.label.startsWith("D")
-                                        ? "text-orange-600 dark:text-orange-400"
-                                        : "text-red-600 dark:text-red-400",
+                                getBandColorClass(currentBand.label)
                               )}
                             >
                               {currentBand.label}
@@ -827,59 +1186,22 @@ export default function GradeCalculator() {
                             <div className="flex justify-between items-center">
                               <div className="flex items-center gap-1">
                                 <span className="text-sm font-medium">Needed for {targetGrade.label}</span>
-                                <TooltipProvider>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <Info className="w-3.5 h-3.5 text-muted-foreground" />
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                      <p>Score needed on final exam to achieve target grade</p>
-                                      {settings.roundToWhole && (
-                                        <p className="text-xs mt-1">(Accounts for rounding to nearest whole number)</p>
-                                      )}
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </TooltipProvider>
+                                <Info className="w-3.5 h-3.5 text-muted-foreground" />
                               </div>
                               <div className="flex items-center gap-1">
                                 <Badge
                                   className={cn(
-                                    targetGrade.required > 100
-                                      ? "bg-red-500"
-                                      : targetGrade.required > 90
-                                        ? "bg-amber-500"
-                                        : targetGrade.required > 70
-                                          ? "bg-green-500"
-                                          : targetGrade.required === 0
-                                            ? "bg-emerald-500"
-                                            : "bg-blue-500",
+                                    getTargetBadgeClass(targetGrade.required),
                                   )}
                                 >
-                                  {targetGrade.required > 100
-                                    ? "Impossible"
-                                    : targetGrade.required === 0
-                                      ? "Already achieved"
-                                      : `${formatGrade(targetGrade.required)}%`}
+                                  {getTargetBadgeText(targetGrade.required)}
                                 </Badge>
                                 {targetGrade.required <= 100 && targetGrade.required > 0 && (
-                                  <TooltipProvider>
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        {targetGrade.required > 90 ? (
-                                          <Lightbulb className="w-4 h-4 text-amber-500" />
-                                        ) : (
-                                          <Sparkles className="w-4 h-4 text-blue-500" />
-                                        )}
-                                      </TooltipTrigger>
-                                      <TooltipContent>
-                                        <p>
-                                          {targetGrade.required > 90
-                                            ? "This will be challenging but possible!"
-                                            : "You're in a good position to achieve this goal!"}
-                                        </p>
-                                      </TooltipContent>
-                                    </Tooltip>
-                                  </TooltipProvider>
+                                  targetGrade.required > 90 ? (
+                                    <Lightbulb className="w-4 h-4 text-amber-500" />
+                                  ) : (
+                                    <Sparkles className="w-4 h-4 text-blue-500" />
+                                  )
                                 )}
                               </div>
                             </div>
@@ -911,7 +1233,7 @@ export default function GradeCalculator() {
                                 size="sm"
                                 className="text-xs"
                                 onClick={() => {
-                                  setSelectedClassId(cls.id)
+                                  handleClassSelection(cls.id)
                                   setActiveTab("insights")
                                 }}
                               >
@@ -924,7 +1246,7 @@ export default function GradeCalculator() {
                                 size="sm"
                                 className="text-xs"
                                 onClick={() => {
-                                  setSelectedClassId(cls.id)
+                                  handleClassSelection(cls.id)
                                   setActiveTab("tables")
                                 }}
                               >
@@ -961,7 +1283,7 @@ export default function GradeCalculator() {
         <TabsContent value="insights" className="space-y-6">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-semibold">Grade Insights</h2>
-            <Select value={selectedClassId || ""} onValueChange={setSelectedClassId} disabled={classes.length === 0}>
+            <Select value={selectedClassId ?? ""} onValueChange={handleClassSelection} disabled={classes.length === 0}>
               <SelectTrigger className="w-[200px]">
                 <SelectValue placeholder="Select a class" />
               </SelectTrigger>
@@ -975,310 +1297,13 @@ export default function GradeCalculator() {
             </Select>
           </div>
 
-          {classes.length === 0 ? (
-            <Card className="p-8 text-center">
-              <div className="flex flex-col items-center">
-                <BookOpen className="h-12 w-12 text-slate-300 mb-4" />
-                <h3 className="text-lg font-medium mb-2">No Classes Added</h3>
-                <p className="text-muted-foreground mb-4">Add some classes to see insights about your grades</p>
-                <Button
-                  onClick={() => {
-                    handleAdd()
-                    setActiveTab("calculator")
-                  }}
-                >
-                  Add Your First Class
-                </Button>
-              </div>
-            </Card>
-          ) : selectedClassId ? (
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Card className="bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 shadow-md">
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="p-3 rounded-full bg-blue-100 dark:bg-blue-900">
-                        <Award className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-                      </div>
-                      <Badge variant="outline" className="font-medium">
-                        Current
-                      </Badge>
-                    </div>
-                    <h3 className="text-2xl font-bold mb-1">
-                      {formatGrade(getClassById(selectedClassId)?.current || 0)}%
-                    </h3>
-                    <p className="text-sm text-muted-foreground">
-                      {getCurrentGradeBand(getClassById(selectedClassId)?.current || 0).label} standing
-                    </p>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 shadow-md">
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="p-3 rounded-full bg-amber-100 dark:bg-amber-900">
-                        <Target className="h-6 w-6 text-amber-600 dark:text-amber-400" />
-                      </div>
-                      <Badge variant="outline" className="font-medium">
-                        Target
-                      </Badge>
-                    </div>
-                    <h3 className="text-2xl font-bold mb-1">{getClassById(selectedClassId)?.target || "None"}</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {getTargetGrade(getClassById(selectedClassId))?.required > 100
-                        ? "Not achievable"
-                        : `Needs ${formatGrade(
-                            getTargetGrade(getClassById(selectedClassId))?.required || 0,
-                          )}% on final`}
-                    </p>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 shadow-md">
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="p-3 rounded-full bg-green-100 dark:bg-green-900">
-                        <TrendingUp className="h-6 w-6 text-green-600 dark:text-green-400" />
-                      </div>
-                      <Badge variant="outline" className="font-medium">
-                        Potential
-                      </Badge>
-                    </div>
-                    <h3 className="text-2xl font-bold mb-1">
-                      {formatGrade(
-                        calculateFinalGrade(
-                          getClassById(selectedClassId)?.current || 0,
-                          getClassById(selectedClassId)?.weight || 0,
-                          100,
-                        ),
-                      )}
-                      %
-                    </h3>
-                    <p className="text-sm text-muted-foreground">Maximum possible final grade</p>
-                  </CardContent>
-                </Card>
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <Card className="shadow-md">
-                  <CardHeader className="flex flex-row items-center justify-between">
-                    <h3 className="text-lg font-medium">Grade Distribution</h3>
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <HelpCircle className="h-4 w-4 text-muted-foreground" />
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Shows where your current grade falls in the grading scale</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </CardHeader>
-                  <CardContent className="pt-0">
-                    <div className="h-[250px]">
-                      <GradeDistribution
-                        currentGrade={getClassById(selectedClassId)?.current || 0}
-                        targetGrade={getTargetGrade(getClassById(selectedClassId))}
-                        gradeBands={gradeBands}
-                      />
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="shadow-md">
-                  <CardHeader className="flex flex-row items-center justify-between">
-                    <h3 className="text-lg font-medium">Final Exam Impact</h3>
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <HelpCircle className="h-4 w-4 text-muted-foreground" />
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Shows how your final exam score will affect your overall grade</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </CardHeader>
-                  <CardContent className="pt-0">
-                    <div className="h-[250px]">
-                      <GradeChart
-                        currentGrade={getClassById(selectedClassId)?.current || 0}
-                        finalWeight={getClassById(selectedClassId)?.weight || 0}
-                        gradeBands={gradeBands}
-                      />
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="shadow-md">
-                  <CardHeader className="flex flex-row items-center justify-between">
-                    <h3 className="text-lg font-medium">Grade Comparison</h3>
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <HelpCircle className="h-4 w-4 text-muted-foreground" />
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Compares your grades across all classes</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </CardHeader>
-                  <CardContent className="pt-0">
-                    <div className="h-[250px]">
-                      <GradeComparison
-                        classes={classes}
-                        selectedClassId={selectedClassId}
-                        gradeBands={gradeBands}
-                        formatGrade={formatGrade}
-                      />
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="shadow-md">
-                  <CardHeader className="flex flex-row items-center justify-between">
-                    <h3 className="text-lg font-medium">Study Timeline</h3>
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <HelpCircle className="h-4 w-4 text-muted-foreground" />
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Recommended study plan to achieve your target grade</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </CardHeader>
-                  <CardContent className="pt-0">
-                    <div className="h-[250px]">
-                      <GradeTimeline
-                        currentGrade={getClassById(selectedClassId)?.current || 0}
-                        finalWeight={getClassById(selectedClassId)?.weight || 0}
-                        targetGrade={getTargetGrade(getClassById(selectedClassId))}
-                        formatGrade={formatGrade}
-                      />
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="lg:col-span-2 shadow-md">
-                  <CardHeader className="flex flex-row items-center justify-between">
-                    <h3 className="text-lg font-medium">What-If Scenarios</h3>
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <HelpCircle className="h-4 w-4 text-muted-foreground" />
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>See how different final exam scores would affect your final grade</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {[100, 90, 80, 70, 60, 0].map((finalScore) => {
-                        const cls = getClassById(selectedClassId) as GradeClass
-                        if (!cls) return null
-
-                        const finalGrade = calculateFinalGrade(cls.current, cls.weight, finalScore)
-                        const letterGrade = getCurrentGradeBand(finalGrade)
-
-                        return (
-                          <Card
-                            key={finalScore}
-                            className={cn(
-                              "overflow-hidden transition-all hover:shadow-md",
-                              finalScore === 100
-                                ? "border-l-4 border-l-emerald-500"
-                                : finalScore >= 80
-                                  ? "border-l-4 border-l-green-500"
-                                  : finalScore >= 60
-                                    ? "border-l-4 border-l-amber-500"
-                                    : "border-l-4 border-l-red-500",
-                            )}
-                          >
-                            <CardContent className="p-4">
-                              <div className="flex items-center justify-between mb-2">
-                                <Badge
-                                  variant="outline"
-                                  className={cn(
-                                    "font-medium",
-                                    finalScore === 100
-                                      ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300"
-                                      : finalScore >= 80
-                                        ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
-                                        : finalScore >= 60
-                                          ? "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300"
-                                          : "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300",
-                                  )}
-                                >
-                                  {finalScore}% on Final
-                                </Badge>
-                                <Badge
-                                  className={cn(
-                                    letterGrade.label.startsWith("A")
-                                      ? "bg-emerald-500"
-                                      : letterGrade.label.startsWith("B")
-                                        ? "bg-green-500"
-                                        : letterGrade.label.startsWith("C")
-                                          ? "bg-amber-500"
-                                          : letterGrade.label.startsWith("D")
-                                            ? "bg-orange-500"
-                                            : "bg-red-500",
-                                  )}
-                                >
-                                  {letterGrade.label}
-                                </Badge>
-                              </div>
-                              <div className="text-center py-2">
-                                <div className="text-3xl font-bold mb-1">{formatGrade(finalGrade)}%</div>
-                                <div className="text-sm text-muted-foreground">Final grade</div>
-                              </div>
-                              <div className="text-xs text-muted-foreground mt-2">
-                                <div className="flex justify-between">
-                                  <span>Current: {formatGrade(cls.current)}%</span>
-                                  <span>Final weight: {formatGrade(cls.weight)}%</span>
-                                </div>
-                              </div>
-                            </CardContent>
-                          </Card>
-                        )
-                      })}
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-
-              <div className="flex justify-center mt-4">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setActiveTab("tables")
-                  }}
-                  className="flex items-center"
-                >
-                  <Table className="w-4 h-4 mr-2" />
-                  View Detailed Grade Tables
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <Card className="p-8 text-center">
-              <div className="flex flex-col items-center">
-                <Target className="h-12 w-12 text-slate-300 mb-4" />
-                <h3 className="text-lg font-medium mb-2">Select a Class</h3>
-                <p className="text-muted-foreground">Choose a class from the dropdown to view detailed insights</p>
-              </div>
-            </Card>
-          )}
+          {renderInsightsContent()}
         </TabsContent>
 
         <TabsContent value="tables" className="space-y-6">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-semibold">Grade Tables</h2>
-            <Select value={selectedClassId || ""} onValueChange={setSelectedClassId} disabled={classes.length === 0}>
+            <Select value={selectedClassId ?? ""} onValueChange={handleClassSelection} disabled={classes.length === 0}>
               <SelectTrigger className="w-[200px]">
                 <SelectValue placeholder="Select a class" />
               </SelectTrigger>
@@ -1344,13 +1369,7 @@ export default function GradeCalculator() {
                                 key={band.label}
                                 className={cn(
                                   "px-4 py-3 text-center font-medium",
-                                  band.label.startsWith("A")
-                                    ? "text-emerald-600 dark:text-emerald-400"
-                                    : band.label.startsWith("B")
-                                      ? "text-green-600 dark:text-green-400"
-                                      : band.label.startsWith("C")
-                                        ? "text-amber-600 dark:text-amber-400"
-                                        : "text-orange-600 dark:text-orange-400",
+                                  getBandColorClass(band.label),
                                 )}
                               >
                                 {band.label}
@@ -1381,20 +1400,10 @@ export default function GradeCalculator() {
                                       key={band.label}
                                       className={cn(
                                         "px-4 py-3 text-center",
-                                        !achievable
-                                          ? "text-red-500"
-                                          : achievable.required > 90
-                                            ? "text-amber-500 font-medium"
-                                            : achievable.required > 70
-                                              ? "text-green-500 font-medium"
-                                              : "text-blue-500 font-medium",
+                                        getAchievableClass(achievable),
                                       )}
                                     >
-                                      {!achievable
-                                        ? "—"
-                                        : achievable.required === 0
-                                          ? "✓"
-                                          : `${formatGrade(achievable.required)}%`}
+                                      {getAchievableText(achievable)}
                                     </td>
                                   )
                                 })}
@@ -1508,31 +1517,15 @@ export default function GradeCalculator() {
                                       <span
                                         className={cn(
                                           "font-medium",
-                                          letterGrade.label.startsWith("A")
-                                            ? "text-emerald-600 dark:text-emerald-400"
-                                            : letterGrade.label.startsWith("B")
-                                              ? "text-green-600 dark:text-green-400"
-                                              : letterGrade.label.startsWith("C")
-                                                ? "text-amber-600 dark:text-amber-400"
-                                                : letterGrade.label.startsWith("D")
-                                                  ? "text-orange-600 dark:text-orange-400"
-                                                  : "text-red-600 dark:text-red-400",
+                                          getBandColorClass(letterGrade.label),
                                         )}
                                       >
-                                        {formatGrade(finalGrade)}%
+                                        {formatFinalGrade(finalGrade)}%
                                       </span>
                                       <span
                                         className={cn(
                                           "text-xs",
-                                          letterGrade.label.startsWith("A")
-                                            ? "text-emerald-600 dark:text-emerald-400"
-                                            : letterGrade.label.startsWith("B")
-                                              ? "text-green-600 dark:text-green-400"
-                                              : letterGrade.label.startsWith("C")
-                                                ? "text-amber-600 dark:text-amber-400"
-                                                : letterGrade.label.startsWith("D")
-                                                  ? "text-orange-600 dark:text-orange-400"
-                                                  : "text-red-600 dark:text-red-400",
+                                          getBandColorClass(letterGrade.label),
                                         )}
                                       >
                                         {letterGrade.label}
@@ -1565,6 +1558,24 @@ export default function GradeCalculator() {
           )}
         </TabsContent>
 
+        <TabsContent value="what-if" className="space-y-6">
+          <EnhancedWhatIf
+            classes={classes}
+            gradeBands={gradeBands}
+            formatGrade={formatGrade}
+          />
+        </TabsContent>
+
+        <TabsContent value="statistics" className="space-y-6">
+          <GradeStatistics
+            classes={classes}
+            gradeBands={gradeBands}
+            formatGrade={formatGrade}
+          />
+        </TabsContent>
+
+
+
         <TabsContent value="settings" className="space-y-6">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-semibold">Settings</h2>
@@ -1578,29 +1589,31 @@ export default function GradeCalculator() {
               <div className="flex flex-col gap-4">
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
-                    <Label htmlFor="round-to-whole">Round to Whole Numbers</Label>
+                    <Label htmlFor="round-to-whole">Round Final Grades</Label>
                     <p className="text-sm text-muted-foreground">
-                      Display grades as whole numbers and account for rounding in calculations
+                      Round only the final calculated grade to the nearest whole number (like on report cards)
                     </p>
                   </div>
                   <Switch
                     id="round-to-whole"
                     checked={settings.roundToWhole}
-                    onCheckedChange={(checked) => setSettings({ ...settings, roundToWhole: checked })}
+                    onCheckedChange={(checked) => updateSettings({ roundToWhole: checked })}
                   />
                 </div>
 
-                <div className="rounded-md bg-blue-50 dark:bg-blue-950 p-3 flex items-start gap-3">
-                  <AlertCircle className="w-5 h-5 text-blue-500 mt-0.5" />
-                  <div className="text-sm text-blue-700 dark:text-blue-300">
-                    <p className="font-medium">Rounding Enabled</p>
-                    <p className="mt-1">
-                      With rounding enabled, only your final calculated grade will be rounded to the nearest whole
-                      number. For example, a final grade of 96.5% would round up to 97%, meaning you would achieve an
-                      A+.
-                    </p>
+                {settings.roundToWhole && (
+                  <div className="rounded-md bg-blue-50 dark:bg-blue-950 p-3 flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-blue-500 mt-0.5" />
+                    <div className="text-sm text-blue-700 dark:text-blue-300">
+                      <p className="font-medium">Final Grade Rounding Enabled</p>
+                      <p className="mt-1">
+                        Only your final calculated grade will be rounded to the nearest whole number, just like on report cards.
+                        Current grades and intermediate calculations remain precise. For example, a final grade of 96.5% would
+                        round up to 97%, potentially changing your letter grade from A to A+.
+                      </p>
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {!settings.roundToWhole && (
                   <div className="space-y-2">
@@ -1639,7 +1652,83 @@ export default function GradeCalculator() {
                   <Switch
                     id="show-credits"
                     checked={settings.showCredits}
-                    onCheckedChange={(checked) => setSettings({ ...settings, showCredits: checked })}
+                    onCheckedChange={(checked) => updateSettings({ showCredits: checked })}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="grading-system">Grading System</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Choose how grades are displayed throughout the app
+                    </p>
+                  </div>
+                  <Select
+                    id="grading-system"
+                    value={settings.gradingSystem ?? "letter"}
+                    onValueChange={(value: "letter" | "percentage" | "gpa") =>
+                      updateSettings({ gradingSystem: value })
+                    }
+                  >
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue placeholder="Select grading system" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="letter">Letter Grades (A, B, C)</SelectItem>
+                      <SelectItem value="percentage">Percentages (0-100%)</SelectItem>
+                      <SelectItem value="gpa">GPA Scale (0.0-4.0)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-md">
+            <CardHeader>
+              <h3 className="text-lg font-medium">Feature Settings</h3>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="flex flex-col gap-4">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="study-reminders">Study Reminders</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Enable notifications for upcoming study sessions
+                    </p>
+                  </div>
+                  <Switch
+                    id="study-reminders"
+                    checked={settings.studyReminderEnabled ?? false}
+                    onCheckedChange={(checked) => updateSettings({ studyReminderEnabled: checked })}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="auto-save">Auto-Save</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Automatically save changes as you make them
+                    </p>
+                  </div>
+                  <Switch
+                    id="auto-save"
+                    checked={settings.autoSaveEnabled ?? true}
+                    onCheckedChange={(checked) => updateSettings({ autoSaveEnabled: checked })}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="custom-grade-bands">Custom Grade Bands</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Define your own custom grade bands and cutoffs
+                    </p>
+                  </div>
+                  <Switch
+                    id="custom-grade-bands"
+                    checked={settings.customGradeBands ?? false}
+                    onCheckedChange={(checked) => updateSettings({ customGradeBands: checked })}
                   />
                 </div>
               </div>
@@ -1652,10 +1741,25 @@ export default function GradeCalculator() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex flex-col sm:flex-row gap-4">
-                <Button onClick={exportData} className="flex items-center">
-                  <Download className="w-4 h-4 mr-2" />
-                  Export Data
-                </Button>
+                <ExportDialog
+                  data={{ classes, settings }}
+                  trigger={
+                    <Button className="flex items-center">
+                      <Download className="w-4 h-4 mr-2" />
+                      Export Data
+                    </Button>
+                  }
+                />
+
+                <ShareDialog
+                  data={{ classes, settings }}
+                  trigger={
+                    <Button variant="outline" className="flex items-center">
+                      <Share2 className="w-4 h-4 mr-2" />
+                      Share Data
+                    </Button>
+                  }
+                />
 
                 <Button
                   variant="outline"
@@ -1724,6 +1828,56 @@ export default function GradeCalculator() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Footer with helpful information */}
+      <div className="mt-8 pt-6 border-t border-border">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm text-muted-foreground">
+          <div>
+            <h4 className="font-medium text-foreground mb-2">Quick Tips</h4>
+            <ul className="space-y-1">
+              <li>• Use What-If scenarios to plan your study strategy</li>
+              <li>• Check the Statistics page for performance insights</li>
+              <li>• Export your data to keep backups</li>
+            </ul>
+          </div>
+          <div>
+            <h4 className="font-medium text-foreground mb-2">Features</h4>
+            <ul className="space-y-1">
+              <li>• Real-time grade calculations</li>
+              <li>• Visual charts and analytics</li>
+              <li>• Mobile-optimized interface</li>
+            </ul>
+          </div>
+          <div>
+            <h4 className="font-medium text-foreground mb-2">Support</h4>
+            <ul className="space-y-1">
+              <li>• All calculations are performed locally</li>
+              <li>• Your data stays private and secure</li>
+              <li>• Works offline as a PWA</li>
+            </ul>
+          </div>
+        </div>
+        <div className="mt-6 pt-4 border-t border-border text-center text-xs text-muted-foreground">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4">
+            <p>Made by <a href="https://jacobbarkin.com" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline font-medium">Jacob Barkin</a></p>
+            <div className="flex items-center gap-2">
+              <span>•</span>
+              <a
+                href="https://github.com/JSB2010/final-exam-grade-calculator"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1 text-primary hover:underline"
+              >
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                </svg>
+                View Source
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
+    </TouchOptimizations>
   )
 }
