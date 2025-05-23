@@ -536,7 +536,14 @@ export default function GradeCalculator() {
   }
 
   const handleDownloadReport = async () => {
-    if (!reportRef.current) return
+    if (!reportRef.current) {
+      toast({
+        title: "No report available",
+        description: "There is no report to download at the moment.",
+        variant: "destructive",
+      })
+      return
+    }
     try {
       await exportToPdf(reportRef.current, {
         filename: "grade-report.pdf",
