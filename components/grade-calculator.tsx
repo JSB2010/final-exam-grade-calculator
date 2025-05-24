@@ -109,7 +109,7 @@ type AppSettings = {
  *
  * @returns The Grade Calculator React component.
  *
- * @remark All user data is stored locally in the browser. Export and import features are available for backup and transfer.
+ * @remarks All user data is stored locally in the browser. Export and import features are available for backup and transfer.
  */
 export default function GradeCalculator() {
   const { toast } = useToast()
