@@ -26,7 +26,7 @@ interface LmsImportDialogProps {
 export function LmsImportDialog({ onImport, trigger }: LmsImportDialogProps) {
   const { toast } = useToast()
   const [open, setOpen] = useState(false)
-  const [provider] = useState("canvas")
+  const provider = "canvas"
   const [school, setSchool] = useState("kds")
   const [baseUrl, setBaseUrl] = useState("https://kentdenver.instructure.com")
   const [token, setToken] = useState("")
