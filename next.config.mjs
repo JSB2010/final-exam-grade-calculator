@@ -9,7 +9,7 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  output: 'export',
+  output: 'standalone',
   reactStrictMode: true,
   compress: true,
   experimental: {
