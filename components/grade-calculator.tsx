@@ -102,6 +102,15 @@ type AppSettings = {
   autoSaveEnabled?: boolean
 }
 
+/**
+ * Renders the Grade Calculator application, providing a comprehensive interface for tracking classes, calculating grades, analyzing final exam requirements, and managing academic data.
+ *
+ * The component features multiple interactive tabs, including a grade calculator, insights dashboard, grade tables, what-if scenarios, statistics, and settings. Users can add and manage classes, set targets, view GPA, analyze grade distributions, and export or import their data. The app supports advanced features such as PDF report downloads, credit-weighted GPA, custom grade bands, and persistent local storage.
+ *
+ * @returns The Grade Calculator React component.
+ *
+ * @remarks All user data is stored locally in the browser. Export and import features are available for backup and transfer.
+ */
 export default function GradeCalculator() {
   const { toast } = useToast()
   const [classes, setClasses] = useLocalStorage<GradeClass[]>("grade-calculator-classes", [
