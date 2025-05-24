@@ -59,14 +59,16 @@ function mapCanvasAssignment(a: any): Assignment {
   }
 }
 
-function mapCanvasCourse(course: any, assignments: any[]): GradeClass {
+const colorPalette = ["bg-blue-500", "bg-red-500", "bg-green-500", "bg-yellow-500", "bg-purple-500"];
+
+function mapCanvasCourse(course: any, assignments: any[], index: number): GradeClass {
   return {
     id: String(course.id),
     name: course.name,
     current: typeof course.grades?.current_score === "number" ? course.grades.current_score : 0,
     weight: 100,
     target: "A",
-    color: "bg-blue-500",
+    color: colorPalette[index % colorPalette.length],
     credits: course.credits || undefined,
     assignments: assignments.map(mapCanvasAssignment),
   }
