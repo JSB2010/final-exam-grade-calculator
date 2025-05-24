@@ -99,6 +99,17 @@ Navigate to [http://localhost:3000](http://localhost:3000) to see the applicatio
 6. **Customize settings** in the settings tab to adjust display preferences
 7. **Export your data** to save your progress or share with others
 
+### Importing from Canvas LMS
+
+1. Choose **Import from LMS** in the toolbar or settings.
+2. Select **Kent Denver School** or choose **Custom** and enter your Canvas URL.
+3. Follow these steps to create a Canvas access token:
+   1. Open **Account &gt; Settings** in Canvas.
+   2. Scroll to **Approved Integrations** and click **New Access Token**.
+   3. Give the token a name and expiration date.
+   4. Copy the generated token.
+4. Paste the token in the dialog and click **Import**.
+
 ## 📊 Grade Calculation Logic
 
 The application uses the following formula to calculate the required score on a final exam:
