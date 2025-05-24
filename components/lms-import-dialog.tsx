@@ -50,24 +50,28 @@ export function LmsImportDialog({ onImport, trigger }: LmsImportDialogProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token, baseUrl }),
       })
-      if (!res.ok) throw new Error("Request failed")
-      const data = await res.json()
+      if (!res.ok) {
+        const errorDetails = `HTTP ${res.status} - ${res.statusText}`;
+        throw new Error(`Request failed: ${errorDetails}`);
+      }
+      const data = await res.json();
       if (Array.isArray(data.classes)) {
-        onImport(data.classes as GradeClass[])
+        onImport(data.classes as GradeClass[]);
         toast({
           title: "Import successful",
           description: "Data imported from your LMS.",
-        })
-        setOpen(false)
+        });
+        setOpen(false);
       } else {
-        throw new Error("Invalid response")
+        throw new Error("Invalid response: Expected an array of classes.");
       }
     } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "An unknown error occurred.";
       toast({
         title: "Import failed",
-        description: "Unable to import data from LMS.",
+        description: errorMessage,
         variant: "destructive",
-      })
+      });
     } finally {
       setLoading(false)
     }
