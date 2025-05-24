@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { X, Download, Share2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import { useIsMobile } from "@/hooks/use-mobile"
 
 interface BeforeInstallPromptEvent extends Event {
   readonly platforms: string[]
@@ -162,31 +163,6 @@ export function MobileOptimizations() {
       </CardContent>
     </Card>
   )
-}
-
-// Hook for detecting mobile devices
-export function useIsMobile() {
-  const [isMobile, setIsMobile] = useState<boolean | undefined>(undefined)
-
-  useEffect(() => {
-    const checkMobile = () => {
-      const userAgent = navigator.userAgent ?? (window as any).opera
-      const mobileRegex = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i
-      setIsMobile(mobileRegex.test(userAgent) || window.innerWidth < 768)
-    }
-
-    checkMobile()
-
-    // Also check on resize
-    const handleResize = () => {
-      setIsMobile(window.innerWidth < 768)
-    }
-
-    window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
-  }, [])
-
-  return !!isMobile
 }
 
 // Component for mobile-specific touch optimizations
