@@ -15,8 +15,28 @@ async function fetchJson(url: string, token: string) {
 }
 
 async function fetchCanvasCourses(baseUrl: string, token: string) {
-  const url = `${baseUrl}/api/v1/courses?enrollment_state=active`
-  return fetchJson(url, token)
+  let url = `${baseUrl}/api/v1/courses?enrollment_state=active&per_page=50`
+  const courses: any[] = []
+
+  while (url) {
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${token}` },
+      next: { revalidate: 0 },
+    })
+    if (!res.ok) {
+      throw new Error(`Request failed: ${res.status}`)
+    }
+
+    const data = await res.json()
+    courses.push(...data)
+
+    // Parse the Link header for the next page URL
+    const linkHeader = res.headers.get("Link")
+    const nextLinkMatch = linkHeader?.match(/<([^>]+)>;\s*rel="next"/)
+    url = nextLinkMatch ? nextLinkMatch[1] : null
+  }
+
+  return courses
 }
 
 async function fetchCanvasAssignments(
