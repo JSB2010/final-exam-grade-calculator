@@ -52,15 +52,15 @@ export async function POST(
   }
   const courses = await coursesRes.json()
 
-  const classes: GradeClass[] = []
-  for (const course of courses) {
+  const assignmentPromises = courses.map(async (course) => {
     const assignmentsRes = await fetch(
       `${baseUrl}/api/v1/courses/${course.id}/assignments?per_page=100&include[]=submission`,
       { headers }
     )
     const assignments = assignmentsRes.ok ? await assignmentsRes.json() : []
-    classes.push(mapClass({ ...course, assignments }))
-  }
+    return mapClass({ ...course, assignments })
+  })
 
+  const classes: GradeClass[] = await Promise.all(assignmentPromises)
   return NextResponse.json({ classes })
 }
