@@ -53,6 +53,26 @@ export const exportToCsv = (data: any[], filename = "export.csv") => {
   linkElement.click()
 }
 
+// Capture an element and return a canvas
+export const captureElement = async (
+  element: HTMLElement,
+): Promise<HTMLCanvasElement> => {
+  return html2canvas(element, {
+    scale: 2,
+    logging: false,
+    useCORS: true,
+    allowTaint: true,
+  })
+}
+
+// Capture an element and return an image data URL
+export const captureElementImage = async (
+  element: HTMLElement,
+): Promise<string> => {
+  const canvas = await captureElement(element)
+  return canvas.toDataURL("image/png")
+}
+
 // Export element to PDF
 export const exportToPdf = async (element: HTMLElement, options: ExportOptions = {}): Promise<void> => {
   const { filename = "export.pdf", title = "Export", includeDetails = true } = options
