@@ -317,3 +317,53 @@ The application is now prepared for additional features:
 - Code is well-documented and maintainable
 
 This comprehensive update transforms the Final Exam Grade Calculator from a basic tool into a professional-grade application suitable for students, educators, and academic institutions.
+
+## ♿ Accessibility Enhancements (Current Session Review)
+
+A thorough accessibility review was conducted, focusing on keyboard navigation, ARIA attributes, semantic HTML, form accessibility, color contrast, and image/icon accessibility. The goal was to ensure the application is usable by a wider range of users, including those relying on assistive technologies.
+
+**Key Areas Reviewed & Enhancements Made:**
+
+1.  **Keyboard Navigation:**
+    *   **Tabs (`components/ui/tabs.tsx` & `grade-calculator.tsx`):** Verified that Radix UI-based tabs are fully keyboard navigable (arrow keys for selection, Tab for moving out). Focus indicators are present.
+    *   **Dialogs (`components/ui/dialog.tsx`, `share-dialog.tsx`, `export-dialog.tsx`):** Verified Radix UI-based dialogs trap focus, are closable with Esc, and interactive elements within are keyboard accessible. Focus is returned to the trigger on close.
+    *   **Accordion (`components/ui/accordion.tsx`):** Verified Radix UI-based accordions are keyboard navigable (arrow keys, Enter/Space to toggle).
+    *   **Form Controls (`grade-calculator.tsx`, `enhanced-what-if.tsx`, etc.):**
+        *   Standard `Input`, `Select`, `Switch`, `Slider`, `Button` components (from `components/ui/`) are inherently keyboard accessible.
+        *   Ensured logical tab order throughout the main application views.
+    *   **Custom Interactive Elements:**
+        *   **"Add Class" Button (`grade-calculator.tsx`):** Changed from a clickable `Card` to a semantic `Button` component to ensure it's keyboard focusable and operable.
+    *   **Visible Focus Indicators:** Standard Tailwind CSS focus rings are consistently applied by shadcn/ui components, providing clear visual feedback.
+
+2.  **ARIA Attributes and Semantic HTML:**
+    *   **Radix UI Based Components (`Tabs`, `Dialog`, `Accordion`, `Select`, `Switch`, `Slider`):** These components handle their respective ARIA roles, states (e.g., `aria-selected`, `aria-expanded`, `aria-modal`, `aria-checked`), and properties (`aria-labelledby`, `aria-controls`) correctly by default. The review confirmed proper usage within the application (e.g., `DialogTitle` and `DialogDescription` for dialog labeling).
+    *   **Icon-Only Buttons:**
+        *   **Remove Class Button (`grade-calculator.tsx`):** Added `aria-label="Remove [class name] class"` for clarity.
+        *   **Copy Link Buttons (`share-dialog.tsx`):** Added `aria-label="Copy shareable link"` and `aria-label="Copy cloud link"` respectively.
+    *   **Sliders with Inputs (`enhanced-what-if.tsx`):**
+        *   `Slider` components were given `aria-labelledby` to associate them with their visible text labels.
+        *   Associated numeric `Input` fields were given specific `aria-label`s (e.g., "Current grade adjustment input") as their visible labels were more general for the slider group.
+
+3.  **Form Accessibility (Labels & IDs):**
+    *   **`grade-calculator.tsx`**: Verified that all `Label` components for inputs, selects, and switches have `htmlFor` attributes correctly matching the `id` of the associated form control. This includes dynamically generated IDs within class cards.
+    *   **`share-dialog.tsx` & `export-dialog.tsx`**: Verified correct `htmlFor`/`id` pairings for all form elements.
+    *   **`enhanced-what-if.tsx`**:
+        *   Added unique `id` attributes to `SelectTrigger` components and updated `Label htmlFor` to match (e.g., `ewif-class-select`).
+        *   Addressed labeling for Sliders and their associated Inputs as noted under ARIA.
+
+4.  **Color Contrast & Content Readability:**
+    *   Reviewed the color palette in `tailwind.config.ts` and `styles/globals.css`.
+    *   The default shadcn/ui themes (light and dark) generally provide good contrast ratios (e.g., `foreground` vs. `background`, `primary` vs. `primary-foreground`).
+    *   `muted-foreground` text color provides WCAG AA compliant contrast against background colors in both light and dark modes.
+    *   Specific component styles (e.g., colored badges, info boxes) were found to use good contrasting text/background pairs (e.g., `bg-blue-50` with `text-blue-700`).
+    *   No obvious low-contrast text elements were identified based on the theme definition. A full audit with a contrast checker tool on rendered pages would be the definitive test.
+
+5.  **Image Accessibility (Icons):**
+    *   **Lucide Icons**: Used throughout the application.
+        *   When used with visible text labels (e.g., on buttons, tabs, feature descriptions on the landing page), they are treated as decorative, which is appropriate.
+        *   For icon-only buttons (as detailed above), `aria-label`s were added.
+    *   **No `<img>` tags were found that would require `alt` text.**
+    *   **`ThemeToggle`**: Already had an appropriate `aria-label`.
+
+**Overall Impact:**
+These enhancements improve the usability of the Grade Calculator for users relying on keyboard navigation and screen readers. By ensuring proper semantic structure, ARIA attributes, and accessible forms, the application is more inclusive. The color palette is generally robust, and icon usage follows good practices.

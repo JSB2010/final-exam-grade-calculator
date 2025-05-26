@@ -62,6 +62,7 @@ import { ShareDialog } from "@/components/share-dialog"
 import { MobileOptimizations, TouchOptimizations } from "@/components/mobile-optimizations"
 import { useLocalStorage } from "@/hooks/use-local-storage"
 import { exportToPdf } from "@/utils/export-utils"
+import useNotifications from '@/hooks/use-notifications'; // Import the new hook
 
 // Define types
 type GradeClass = {
@@ -99,6 +100,7 @@ type AppSettings = {
   gradingSystem?: "letter" | "percentage" | "gpa"
   theme?: "light" | "dark" | "system"
   studyReminderEnabled?: boolean
+    studyReminderTime?: string // Added for reminder time
   autoSaveEnabled?: boolean
 }
 
@@ -165,8 +167,19 @@ export default function GradeCalculator() {
     gradingSystem: "letter",
     theme: "system",
     studyReminderEnabled: false,
+    studyReminderTime: "17:00", // Default reminder time (5 PM)
     autoSaveEnabled: true
   })
+
+  // Notification Hook
+  const {
+    permissionStatus: notificationPermission,
+    requestPermission: requestNotificationPermission,
+    showLocalNotification,
+    scheduleDailyReminder, // Import scheduling functions
+    cancelScheduledReminder, // Import scheduling functions
+    checkActiveReminders, // For debugging
+  } = useNotifications();
 
   // Create a memoized function to update settings to prevent unnecessary re-renders
   const updateSettings = useCallback((newSettings: Partial<AppSettings>) => {
@@ -175,6 +188,37 @@ export default function GradeCalculator() {
       ...newSettings
     }))
   }, [setSettings])
+
+  // Effect to manage scheduled reminders based on settings
+  useEffect(() => {
+    if (settings.studyReminderEnabled && settings.studyReminderTime && notificationPermission === 'granted') {
+      const reminderDetails = {
+        id: 'daily-study-reminder',
+        time: settings.studyReminderTime,
+        title: 'Study Reminder!',
+        options: {
+          body: "Don't forget to study today. Open Grade Calculator to plan your session.",
+          icon: '/icon.svg',
+          tag: 'daily-study-reminder', // Ensures this notification replaces any previous one with the same tag
+          data: { url: '/calculator' } // Data to be used by SW on notification click
+        }
+      };
+      scheduleDailyReminder(reminderDetails);
+      console.log("Daily study reminder scheduled based on settings.");
+      // Optional: For debugging, immediately check active reminders
+      // checkActiveReminders(); 
+    } else {
+      // If reminders are disabled, time is not set, or permission is not granted, cancel them
+      cancelScheduledReminder('daily-study-reminder');
+      console.log("Daily study reminder cancelled or conditions not met.");
+    }
+
+    // Cleanup function to cancel reminder if component unmounts or dependencies change
+    return () => {
+      cancelScheduledReminder('daily-study-reminder');
+    };
+  }, [settings.studyReminderEnabled, settings.studyReminderTime, notificationPermission, scheduleDailyReminder, cancelScheduledReminder]);
+
 
   const [showAdvanced, setShowAdvanced] = useState(false)
   const reportRef = useRef<HTMLDivElement>(null)
@@ -1084,7 +1128,13 @@ export default function GradeCalculator() {
                             {settings.showCredits && <span>• {cls.credits} credits</span>}
                           </div>
                         </div>
-                        <Button size="icon" variant="ghost" onClick={() => handleRemove(cls.id)} className="h-8 w-8">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => handleRemove(cls.id)}
+                          className="h-8 w-8"
+                          aria-label={`Remove ${cls.name} class`}
+                        >
                           <X className="w-4 h-4" />
                         </Button>
                       </CardHeader>
@@ -1300,18 +1350,19 @@ export default function GradeCalculator() {
             </AnimatePresence>
 
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-              <Card
-                className="flex items-center justify-center p-6 h-full border-dashed cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+              {/* Replaced Card with Button for Add Class functionality */}
+              <Button
+                variant="outline"
+                className="flex flex-col items-center justify-center p-6 h-full border-dashed hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors w-full"
                 onClick={handleAdd}
+                aria-label="Add a new class"
               >
-                <div className="flex flex-col items-center text-center">
-                  <div className="h-12 w-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-2">
-                    <Plus className="h-6 w-6 text-slate-500" />
-                  </div>
-                  <h3 className="font-medium">Add Class</h3>
-                  <p className="text-sm text-muted-foreground">Track another course</p>
+                <div className="h-12 w-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-2">
+                  <Plus className="h-6 w-6 text-slate-500" />
                 </div>
-              </Card>
+                <h3 className="font-medium">Add Class</h3>
+                <p className="text-sm text-muted-foreground">Track another course</p>
+              </Button>
             </motion.div>
           </div>
         </TabsContent>
@@ -1736,15 +1787,69 @@ export default function GradeCalculator() {
                   <Switch
                     id="study-reminders"
                     checked={settings.studyReminderEnabled ?? false}
-                    onCheckedChange={(checked) => updateSettings({ studyReminderEnabled: checked })}
+                    onCheckedChange={async (checked) => {
+                      if (checked && notificationPermission !== 'granted') {
+                        const status = await requestNotificationPermission();
+                        if (status === 'granted') {
+                          updateSettings({ studyReminderEnabled: true });
+                          toast({ title: "Notifications Enabled", description: "Study reminders are now active." });
+                        } else {
+                          updateSettings({ studyReminderEnabled: false });
+                          toast({
+                            title: "Permission Required",
+                            description: "Notification permission was not granted. Reminders cannot be set.",
+                            variant: "destructive",
+                          });
+                        }
+                      } else {
+                        updateSettings({ studyReminderEnabled: checked });
+                        if (!checked) {
+                           toast({ title: "Notifications Disabled", description: "Study reminders are now inactive." });
+                        }
+                      }
+                    }}
                   />
                 </div>
+
+                {settings.studyReminderEnabled && (
+                  <div className="pl-4 space-y-3 border-l-2 ml-2">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label htmlFor="reminder-time">Preferred Reminder Time</Label>
+                        <p className="text-xs text-muted-foreground">
+                          Set a time for your daily study reminder.
+                        </p>
+                      </div>
+                      <Input
+                        id="reminder-time"
+                        type="time"
+                        value={settings.studyReminderTime ?? "17:00"}
+                        onChange={(e) => updateSettings({ studyReminderTime: e.target.value })}
+                        className="w-[120px]"
+                      />
+                    </div>
+                     <div className="text-xs text-muted-foreground pt-1">
+                      Notification Permission: <span className={cn(
+                        "font-semibold",
+                        notificationPermission === 'granted' && "text-green-600",
+                        notificationPermission === 'denied' && "text-red-600",
+                      )}>
+                        {notificationPermission.charAt(0).toUpperCase() + notificationPermission.slice(1)}
+                      </span>
+                      {notificationPermission === 'denied' && (
+                        <p className="text-xs">
+                          To enable reminders, please allow notifications for this site in your browser settings.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
                     <Label htmlFor="auto-save">Auto-Save</Label>
                     <p className="text-sm text-muted-foreground">
-                      Automatically save changes as you make them
+                      Automatically save changes as you make them.
                     </p>
                   </div>
                   <Switch
@@ -1754,11 +1859,18 @@ export default function GradeCalculator() {
                   />
                 </div>
 
+                 {/* Test button for local notification - can be removed later */}
+                {process.env.NODE_ENV === 'development' && settings.studyReminderEnabled && notificationPermission === 'granted' && (
+                  <Button onClick={() => showLocalNotification("Test Reminder", { body: "This is a test notification from Grade Calculator."})} variant="outline" size="sm">
+                    Test Notification
+                  </Button>
+                )}
+
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
                     <Label htmlFor="custom-grade-bands">Custom Grade Bands</Label>
                     <p className="text-sm text-muted-foreground">
-                      Define your own custom grade bands and cutoffs
+                      Define your own custom grade bands and cutoffs.
                     </p>
                   </div>
                   <Switch

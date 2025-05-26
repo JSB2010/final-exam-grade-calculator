@@ -61,45 +61,49 @@ function doBackgroundSync() {
 }
 
 // Push notifications (for study reminders)
-self.addEventListener('push', (event) => {
-  const options = {
-    body: event.data ? event.data.text() : 'Time to study for your finals!',
-    icon: '/icon-192x192.png',
-    badge: '/icon-192x192.png',
-    vibrate: [100, 50, 100],
-    data: {
-      dateOfArrival: Date.now(),
-      primaryKey: 1
-    },
-    actions: [
-      {
-        action: 'explore',
-        title: 'Open Calculator',
-        icon: '/icon-192x192.png'
-      },
-      {
-        action: 'close',
-        title: 'Close',
-        icon: '/icon-192x192.png'
-      }
-    ]
+self.addEventListener('push', event => {
+  const data = event.data ? event.data.json() : { title: 'Study Reminder', body: 'Time to study for your finals!', tag: 'default-reminder' };
+  event.waitUntil(
+    self.registration.showNotification(data.title, {
+      body: data.body,
+      icon: '/icon.svg', // Using available SVG icon
+      tag: data.tag || 'default-reminder', // Tag can be used to group or replace notifications
+      data: data.data || {} // Pass along any additional data from the push
+    })
+  );
+});
+
+// Handle notification clicks
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+
+  // Default behavior: open the main page or focus an existing window
+  let targetUrl = '/calculator'; // Default page to open
+  if (event.notification.data && event.notification.data.url) {
+    targetUrl = event.notification.data.url; // Open specific URL if provided in push data
   }
 
   event.waitUntil(
-    self.registration.showNotification('Grade Calculator', options)
-  )
-})
-
-// Handle notification clicks
-self.addEventListener('notificationclick', (event) => {
-  event.notification.close()
-
-  if (event.action === 'explore') {
-    event.waitUntil(
-      clients.openWindow('/calculator')
-    )
-  }
-})
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clientList => {
+      // Check if a window with the target URL is already open
+      for (const client of clientList) {
+        if (client.url === targetUrl && 'focus' in client) {
+          return client.focus();
+        }
+      }
+      // If not, open a new window
+      if (clients.openWindow) {
+        return clients.openWindow(targetUrl);
+      }
+    }).catch(err => {
+      console.error("Error handling notification click: ", err);
+      // Fallback if matchAll or openWindow fails
+      if (clients.openWindow) {
+        return clients.openWindow('/');
+      }
+    })
+  );
+});
 
 // Handle message events from the main thread
 self.addEventListener('message', (event) => {

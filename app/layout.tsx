@@ -37,9 +37,25 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  // Define global functions for Google API script callbacks
+  if (typeof window !== 'undefined') {
+    (window as any).gapiLoaded = () => {
+      console.log('Google API script (api.js) loaded.');
+      // Dispatch a custom event that React components can listen to
+      window.dispatchEvent(new CustomEvent('gapiLoaded'));
+    };
+    (window as any).gisLoaded = () => {
+      console.log('Google Identity Services script (client) loaded.');
+      // Dispatch a custom event that React components can listen to
+      window.dispatchEvent(new CustomEvent('gisLoaded'));
+    };
+  }
+
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        <script async defer src="https://apis.google.com/js/api.js" onLoad="gapiLoaded()"></script>
+        <script async defer src="https://accounts.google.com/gsi/client" onLoad="gisLoaded()"></script>
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
         <meta name="theme-color" content="#3b82f6" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
