@@ -237,9 +237,9 @@ export default function EnhancedWhatIf({ classes, gradeBands, formatGrade }: Rea
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="class-select">Select Class</Label>
+              <Label htmlFor="ewif-class-select">Select Class</Label>
               <Select value={selectedClassId} onValueChange={setSelectedClassId}>
-                <SelectTrigger>
+                <SelectTrigger id="ewif-class-select">
                   <SelectValue placeholder="Choose a class" />
                 </SelectTrigger>
                 <SelectContent>
@@ -256,9 +256,9 @@ export default function EnhancedWhatIf({ classes, gradeBands, formatGrade }: Rea
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="scenario-type">Scenario Type</Label>
+              <Label htmlFor="ewif-scenario-type">Scenario Type</Label>
               <Select value={scenarioType} onValueChange={(value: any) => setScenarioType(value)}>
-                <SelectTrigger>
+                <SelectTrigger id="ewif-scenario-type">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -287,9 +287,9 @@ export default function EnhancedWhatIf({ classes, gradeBands, formatGrade }: Rea
 
           {scenarioType === "target" && (
             <div className="space-y-2">
-              <Label htmlFor="target-grade">Target Grade</Label>
+              <Label htmlFor="ewif-target-grade">Target Grade</Label>
               <Select value={targetGrade} onValueChange={setTargetGrade}>
-                <SelectTrigger>
+                <SelectTrigger id="ewif-target-grade">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -304,7 +304,7 @@ export default function EnhancedWhatIf({ classes, gradeBands, formatGrade }: Rea
           )}
 
           <div className="space-y-2">
-            <Label htmlFor="current-adjustment">
+            <Label htmlFor="ewif-current-adjustment-slider" id="ewif-current-adjustment-label">
               Current Grade Adjustment: {currentGradeAdjustment > 0 ? '+' : ''}{currentGradeAdjustment}%
             </Label>
             <p className="text-xs text-muted-foreground">
@@ -313,12 +313,14 @@ export default function EnhancedWhatIf({ classes, gradeBands, formatGrade }: Rea
             <div className="flex items-center gap-4">
               <div className="flex-1">
                 <Slider
+                  id="ewif-current-adjustment-slider"
                   value={[currentGradeAdjustment]}
                   onValueChange={(value) => setCurrentGradeAdjustment(value[0])}
                   min={-20}
                   max={20}
                   step={1}
                   className="w-full"
+                  aria-labelledby="ewif-current-adjustment-label"
                 />
                 <div className="flex justify-between text-sm text-muted-foreground mt-1">
                   <span>-20%</span>
@@ -340,6 +342,7 @@ export default function EnhancedWhatIf({ classes, gradeBands, formatGrade }: Rea
                   max={20}
                   className="text-center"
                   placeholder="0"
+                  aria-label="Current grade adjustment input"
                 />
               </div>
             </div>
@@ -347,7 +350,7 @@ export default function EnhancedWhatIf({ classes, gradeBands, formatGrade }: Rea
 
           {scenarioType !== "risk" && (
             <div className="space-y-2">
-              <Label htmlFor="final-score">
+              <Label htmlFor="ewif-final-score-slider" id="ewif-final-score-label">
                 Final Exam Score: {finalExamScore}%
               </Label>
               <p className="text-xs text-muted-foreground">
@@ -356,12 +359,14 @@ export default function EnhancedWhatIf({ classes, gradeBands, formatGrade }: Rea
               <div className="flex items-center gap-4">
                 <div className="flex-1">
                   <Slider
+                    id="ewif-final-score-slider"
                     value={[finalExamScore]}
                     onValueChange={(value) => setFinalExamScore(value[0])}
                     min={0}
                     max={100}
                     step={1}
                     className="w-full"
+                    aria-labelledby="ewif-final-score-label"
                   />
                   <div className="flex justify-between text-sm text-muted-foreground mt-1">
                     <span>0%</span>
@@ -383,6 +388,7 @@ export default function EnhancedWhatIf({ classes, gradeBands, formatGrade }: Rea
                     max={100}
                     className="text-center"
                     placeholder="85"
+                    aria-label="Final exam score input"
                   />
                 </div>
               </div>
