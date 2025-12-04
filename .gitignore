@@ -29,8 +29,8 @@ next-env.d.ts
 # Cloudflare
 .cloudflare/
 
-# Lock files (keep only pnpm-lock.yaml since project uses pnpm)
-package-lock.json
+# Lock files (keep only package-lock.json since project uses npm)
+pnpm-lock.yaml
 yarn.lock
 
 # macOS
