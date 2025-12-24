@@ -29,6 +29,18 @@ interface LmsImportDialogProps {
   trigger?: React.ReactNode
 }
 
+/**
+ * Render a dialog that lets users connect to a Canvas LMS and import class data.
+ *
+ * The dialog provides controls to choose a predefined school or enter a custom Canvas URL,
+ * supply an API token, and initiate the import. On successful import the component invokes
+ * the `onImport` callback with the array of imported classes and displays a success toast;
+ * on failure it displays an error toast.
+ *
+ * @param onImport - Callback invoked with the imported array of `GradeClass` objects after a successful import
+ * @param trigger - Optional React node to use as the dialog trigger; if omitted a default button is rendered
+ * @returns The dialog component that manages LMS connection and import UI
+ */
 export function LmsImportDialog({ onImport, trigger }: LmsImportDialogProps) {
   const { toast } = useToast()
   const [open, setOpen] = useState(false)

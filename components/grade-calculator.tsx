@@ -101,6 +101,15 @@ type AppSettings = {
   autoSaveEnabled?: boolean
 }
 
+/**
+ * Renders the interactive Grade Calculator UI for managing classes, assignments, and settings,
+ * and for calculating final grades, required final exam scores, GPA, and visual insights.
+ *
+ * The component persists classes and user settings to localStorage, supports import/export (including LMS imports),
+ * provides tools for adding/removing classes and assignments, and exposes tables, charts, and what-if scenarios.
+ *
+ * @returns The React element that renders the full grade calculator interface.
+ */
 export default function GradeCalculator() {
   const { toast } = useToast()
   const [classes, setClasses] = useLocalStorage<GradeClass[]>("grade-calculator-classes", [

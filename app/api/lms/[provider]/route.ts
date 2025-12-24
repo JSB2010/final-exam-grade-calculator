@@ -3,6 +3,12 @@ import type { GradeClass, Assignment } from "@/types/grade-calculator"
 
 export const runtime = "edge"
 
+/**
+ * Convert a raw assignment object into the application's normalized Assignment shape.
+ *
+ * @param a - Raw assignment object returned by the provider (may be partial)
+ * @returns An Assignment with normalized fields: `id` (string, generated UUID if missing), `name` (default "Assignment"), `score` (numeric, default 0), `totalPoints` (numeric, default 100), `weight` (0), and `date` (ISO string or `undefined`)
+ */
 function mapAssignment(a: any): Assignment {
   return {
     id: String(a.id ?? crypto.randomUUID()),
@@ -14,6 +20,12 @@ function mapAssignment(a: any): Assignment {
   }
 }
 
+/**
+ * Convert a raw course-like object into a normalized GradeClass.
+ *
+ * @param c - Source object containing course data. Expected properties: `id` (any), `name` (string), `grades?.current_score` or `currentGrade` (number), `credits` (any), and `assignments` (array of assignment-like objects).
+ * @returns A GradeClass with `id` as a string, `name`, `current` score, `weight`, `target`, `color`, `credits` copied from the source, and `assignments` as an array of mapped Assignment objects.
+ */
 function mapClass(c: any): GradeClass {
   return {
     id: String(c.id ?? crypto.randomUUID()),
@@ -27,6 +39,16 @@ function mapClass(c: any): GradeClass {
   }
 }
 
+/**
+ * Handles POST requests to fetch and transform Canvas course and assignment data into internal `GradeClass` objects.
+ *
+ * The request body must include `token` and `baseUrl`. If valid, the function fetches active courses from the Canvas API,
+ * then fetches each course's assignments (including submissions), maps the results into `GradeClass` entries, and returns
+ * a JSON object with a `classes` array.
+ *
+ * @param params.provider - The LMS provider identifier; only `"canvas"` is supported.
+ * @returns A JSON response containing `{ classes: GradeClass[] }` on success, or `{ error: string }` with HTTP 400 for unsupported provider, missing input, or failed course fetch. 
+ */
 export async function POST(
   req: NextRequest,
   { params }: { params: { provider: string } }
