@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
+import Script from 'next/script'
 import './globals.css'
 import { ThemeProvider } from '@/components/theme-provider'
 import { Toaster } from '@/components/ui/toaster'
@@ -59,6 +60,10 @@ export default function RootLayout({
           {children}
           <Toaster />
         </ThemeProvider>
+        <Script 
+          src="https://jacobbarkin.com/embed/credit.js" 
+          strategy="afterInteractive"
+        />
         <script
           dangerouslySetInnerHTML={{
             __html: `
