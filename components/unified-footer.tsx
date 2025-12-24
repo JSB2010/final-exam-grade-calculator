@@ -19,17 +19,8 @@ export function UnifiedFooter() {
             </Link>
           </div>
           <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4 mt-4 md:mt-0">
-            <p className="text-sm text-muted-foreground">
-              Made by{" "}
-              <a 
-                href="https://jacobbarkin.com" 
-                target="_blank" 
-                rel="noopener noreferrer" 
-                className="text-primary hover:underline font-medium"
-              >
-                Jacob Barkin
-              </a>
-            </p>
+            {/* @ts-ignore - Custom element from Jacob Barkin credit embed script */}
+            <jb-credit data-variant="chip" data-theme="auto"></jb-credit>
             <div className="flex items-center gap-2">
               <span className="text-muted-foreground">•</span>
               <a
