@@ -14,7 +14,7 @@ export default function Home() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <GraduationCap className="h-6 w-6 text-primary" />
-              <span className="font-bold text-xl">GradeCalc Pro</span>
+              <span className="font-bold text-xl">FinalsCalc</span>
             </div>
             <div className="flex items-center gap-4">
               <nav className="hidden md:flex">
@@ -33,7 +33,7 @@ export default function Home() {
       <div className="container mx-auto py-12 px-4 relative z-10">
         <div className="max-w-4xl mx-auto mb-16 text-center">
           <h1 className="text-4xl md:text-6xl font-bold mb-6 gradient-heading animate-in">
-            Final Exam Grade Calculator
+            FinalsCalc
           </h1>
           <p className="text-xl md:text-2xl text-muted-foreground mb-8 max-w-2xl mx-auto">
             Calculate exactly what you need on your finals to achieve your target grades. Now with advanced analytics, what-if scenarios, and mobile support.

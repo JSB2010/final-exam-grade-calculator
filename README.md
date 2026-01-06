@@ -1,12 +1,12 @@
-# Final Exam Grade Calculator
+# FinalsCalc
 
 [![Built with Next.js](https://img.shields.io/badge/Built%20with-Next.js-000000?style=for-the-badge&logo=next.js)](https://nextjs.org/)
 [![Styled with Tailwind CSS](https://img.shields.io/badge/Styled%20with-Tailwind%20CSS-38B2AC?style=for-the-badge&logo=tailwind-css)](https://tailwindcss.com/)
 [![Deployed on Cloudflare Pages](https://img.shields.io/badge/Deployed%20on-Cloudflare%20Pages-F38020?style=for-the-badge&logo=cloudflare)](https://pages.cloudflare.com/)
 
-A powerful and intuitive web application that helps students calculate what they need on their final exams to achieve their target grades. This tool provides comprehensive grade analysis, visualizations, and advanced what-if scenarios to help students plan their study strategies effectively. Now featuring enhanced analytics, mobile optimization, and intelligent user guidance.
+FinalsCalc is a powerful and intuitive web application that helps students calculate what they need on their final exams to achieve their target grades. This tool provides comprehensive grade analysis, visualizations, and advanced what-if scenarios to help students plan their study strategies effectively. Now featuring enhanced analytics, mobile optimization, and intelligent user guidance.
 
-![Grade Calculator Screenshot](public/website_scrnsht.png)
+![FinalsCalc Screenshot](public/website_scrnsht.png)
 
 ## 🌟 Features
 
@@ -52,11 +52,11 @@ A powerful and intuitive web application that helps students calculate what they
 
 ## 🛠️ Installation & Setup
 
-1. **Clone the repository**
+1. **Clone the FinalsCalc repository**
 
 ```bash
-git clone https://github.com/JSB2010/final-exam-grade-calculator.git
-cd final-exam-grade-calculator
+git clone https://github.com/JSB2010/final-exam-grade-calculator.git finals-calc
+cd finals-calc
 ```
 
 2. **Install dependencies**

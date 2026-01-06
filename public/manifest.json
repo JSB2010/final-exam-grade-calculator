@@ -1,7 +1,7 @@
 {
-  "name": "Final Exam Grade Calculator",
-  "short_name": "Grade Calculator",
-  "description": "Calculate what you need on your final exam to achieve your target grade",
+  "name": "FinalsCalc",
+  "short_name": "FinalsCalc",
+  "description": "FinalsCalc shows what you need on your final exam to achieve your target grade",
   "start_url": "/calculator",
   "display": "standalone",
   "background_color": "#ffffff",
@@ -35,14 +35,14 @@
       "sizes": "1280x720",
       "type": "image/png",
       "form_factor": "wide",
-      "label": "Grade Calculator - Desktop View"
+      "label": "FinalsCalc - Desktop View"
     },
     {
       "src": "/screenshot-narrow.png",
       "sizes": "390x844",
       "type": "image/png",
       "form_factor": "narrow",
-      "label": "Grade Calculator - Mobile View"
+      "label": "FinalsCalc - Mobile View"
     }
   ],
   "shortcuts": [

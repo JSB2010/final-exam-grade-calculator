@@ -30,7 +30,7 @@ export default function CalculatorPage() {
       <div className="container mx-auto py-8 px-4 relative z-10">
         <div className="max-w-4xl mx-auto mb-8 text-center">
           <h1 className="text-3xl md:text-4xl font-bold mb-4 gradient-heading">
-            Final Exam Grade Calculator
+            FinalsCalc
           </h1>
           <p className="text-lg text-muted-foreground mb-8">
             Calculate exactly what you need on your finals to achieve your target grades

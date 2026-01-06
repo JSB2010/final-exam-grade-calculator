@@ -1,4 +1,4 @@
-const CACHE_NAME = 'grade-calculator-v1'
+const CACHE_NAME = 'finalscalc-v1'
 const urlsToCache = [
   '/',
   '/calculator',
@@ -86,7 +86,7 @@ self.addEventListener('push', (event) => {
   }
 
   event.waitUntil(
-    self.registration.showNotification('Grade Calculator', options)
+    self.registration.showNotification('FinalsCalc', options)
   )
 })
 

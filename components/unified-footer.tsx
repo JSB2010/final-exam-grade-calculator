@@ -8,7 +8,7 @@ export function UnifiedFooter() {
         <div className="flex flex-col md:flex-row justify-between items-center">
           <div className="flex items-center gap-2 mb-4 md:mb-0">
             <GraduationCap className="h-5 w-5 text-primary" />
-            <span className="font-semibold">GradeCalc Pro</span>
+            <span className="font-semibold">FinalsCalc</span>
           </div>
           <div className="flex items-center gap-4">
             <Link href="/" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
@@ -19,17 +19,7 @@ export function UnifiedFooter() {
             </Link>
           </div>
           <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4 mt-4 md:mt-0">
-            <p className="text-sm text-muted-foreground">
-              Made by{" "}
-              <a 
-                href="https://jacobbarkin.com" 
-                target="_blank" 
-                rel="noopener noreferrer" 
-                className="text-primary hover:underline font-medium"
-              >
-                Jacob Barkin
-              </a>
-            </p>
+            <jb-credit data-variant="prominent" />
             <div className="flex items-center gap-2">
               <span className="text-muted-foreground">•</span>
               <a

@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
+import Script from 'next/script'
 import './globals.css'
 import { ThemeProvider } from '@/components/theme-provider'
 import { Toaster } from '@/components/ui/toaster'
@@ -7,28 +8,28 @@ import { Toaster } from '@/components/ui/toaster'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Final Exam Grade Calculator',
-  description: 'Calculate what you need on your finals to achieve your target grades',
+  title: 'FinalsCalc',
+  description: 'FinalsCalc shows what you need on your finals to hit your target grades',
   generator: 'v0.dev',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
-    title: 'Grade Calculator',
+    title: 'FinalsCalc',
   },
   formatDetection: {
     telephone: false,
   },
   openGraph: {
     type: 'website',
-    siteName: 'Final Exam Grade Calculator',
-    title: 'Final Exam Grade Calculator',
-    description: 'Calculate what you need on your finals to achieve your target grades',
+    siteName: 'FinalsCalc',
+    title: 'FinalsCalc',
+    description: 'FinalsCalc shows what you need on your finals to hit your target grades',
   },
   twitter: {
     card: 'summary',
-    title: 'Final Exam Grade Calculator',
-    description: 'Calculate what you need on your finals to achieve your target grades',
+    title: 'FinalsCalc',
+    description: 'FinalsCalc shows what you need on your finals to hit your target grades',
   },
 }
 
@@ -59,6 +60,7 @@ export default function RootLayout({
           {children}
           <Toaster />
         </ThemeProvider>
+        <Script src="https://jacobbarkin.com/embed/credit.js" strategy="afterInteractive" />
         <script
           dangerouslySetInnerHTML={{
             __html: `
