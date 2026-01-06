@@ -7,6 +7,10 @@ export type GradeClass = {
   assignments: Assignment[]
   color: string
   credits?: number
+  source?: "manual" | "canvas"
+  canvasCourseId?: number
+  canvasCourseUrl?: string
+  lastSyncedAt?: string
 }
 
 export type Assignment = {

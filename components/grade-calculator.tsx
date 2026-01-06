@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge"
 import { Slider } from "@/components/ui/slider"
 import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -48,6 +49,11 @@ import {
   Dices,
   Share2,
   FileDown,
+  Loader2,
+  KeyRound,
+  Globe2,
+  RefreshCw,
+  ShieldCheck,
 } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useToast } from "@/hooks/use-toast"
@@ -62,6 +68,7 @@ import { ShareDialog } from "@/components/share-dialog"
 import { MobileOptimizations, TouchOptimizations } from "@/components/mobile-optimizations"
 import { useLocalStorage } from "@/hooks/use-local-storage"
 import { exportToPdf } from "@/utils/export-utils"
+import { fetchCanvasCourses, fetchCanvasCoursesProxy, normalizeCanvasBaseUrl, pickStudentEnrollment } from "@/utils/canvas-api"
 
 // Define types
 type GradeClass = {
@@ -73,6 +80,10 @@ type GradeClass = {
   assignments: Assignment[]
   color: string
   credits?: number
+  source?: "manual" | "canvas"
+  canvasCourseId?: number
+  canvasCourseUrl?: string
+  lastSyncedAt?: string
 }
 
 type Assignment = {
@@ -183,6 +194,27 @@ export default function GradeCalculator() {
     classes.length > 0 ? classes[0].id : null,
   )
   const [lastInsightsClassId, setLastInsightsClassId] = useState<string | null>(null)
+  const [canvasBaseUrl, setCanvasBaseUrl] = useLocalStorage<string>("grade-calculator-canvas-base-url", "")
+  const [canvasDefaultWeight, setCanvasDefaultWeight] = useLocalStorage<number>(
+    "grade-calculator-canvas-default-weight",
+    20,
+  )
+  const [rememberCanvasToken, setRememberCanvasToken] = useLocalStorage<boolean>(
+    "grade-calculator-remember-canvas-token",
+    false,
+  )
+  const [persistedCanvasToken, setPersistedCanvasToken] = useLocalStorage<string>(
+    "grade-calculator-canvas-token",
+    "",
+  )
+  const [canvasToken, setCanvasToken] = useState<string>("")
+  const [lastCanvasSync, setLastCanvasSync] = useLocalStorage<string | null>(
+    "grade-calculator-canvas-last-sync",
+    null,
+  )
+  const [isCanvasSyncing, setIsCanvasSyncing] = useState(false)
+  const [canvasSyncMessage, setCanvasSyncMessage] = useState<string | null>(null)
+  const [canvasImportedCount, setCanvasImportedCount] = useState(0)
 
   // Custom function to handle class selection with synchronization
   const handleClassSelection = (classId: string | null) => {
@@ -213,6 +245,20 @@ export default function GradeCalculator() {
     }
   }, [activeTab, classes, lastInsightsClassId, selectedClassId])
 
+  useEffect(() => {
+    if (rememberCanvasToken && persistedCanvasToken && !canvasToken) {
+      setCanvasToken(persistedCanvasToken)
+    }
+  }, [rememberCanvasToken, persistedCanvasToken, canvasToken])
+
+  useEffect(() => {
+    if (rememberCanvasToken) {
+      setPersistedCanvasToken(canvasToken)
+    } else if (persistedCanvasToken) {
+      setPersistedCanvasToken("")
+    }
+  }, [rememberCanvasToken, canvasToken, persistedCanvasToken, setPersistedCanvasToken])
+
   const gradeBands: GradeBand[] = [
     { label: "A+", cutoff: 97, color: "bg-emerald-500" },
     { label: "A", cutoff: 93, color: "bg-emerald-400" },
@@ -242,6 +288,8 @@ export default function GradeCalculator() {
     { name: "Emerald", value: "bg-emerald-500" },
   ]
 
+  const canvasTokenToUse = rememberCanvasToken ? canvasToken || persistedCanvasToken : canvasToken
+
   // Generate a unique ID
   const generateId = () => {
     return Math.random().toString(36).substring(2, 9)
@@ -257,6 +305,13 @@ export default function GradeCalculator() {
       return Math.round(grade).toString()
     }
     return grade.toFixed(settings.showDecimalPlaces)
+  }
+
+  const formatLastSync = (timestamp: string | null): string => {
+    if (!timestamp) return "Never"
+    const parsed = new Date(timestamp)
+    if (Number.isNaN(parsed.getTime())) return "Unknown"
+    return parsed.toLocaleString()
   }
 
   // Helper function to get color class based on grade band
@@ -478,6 +533,10 @@ export default function GradeCalculator() {
     return gradeBands[gradeBands.length - 1] // F
   }
 
+  const getSuggestedTarget = (grade: number) => {
+    return getCurrentGradeBand(grade).label
+  }
+
   const exportData = () => {
     const dataStr = JSON.stringify({ classes, settings }, null, 2)
     const dataUri = `data:application/json;charset=utf-8,${encodeURIComponent(dataStr)}`
@@ -542,6 +601,198 @@ export default function GradeCalculator() {
       title: "Data reset",
       description: "All your grade data has been cleared.",
     })
+  }
+
+  const handleCanvasBaseUrlBlur = () => {
+    if (canvasBaseUrl) {
+      setCanvasBaseUrl(normalizeCanvasBaseUrl(canvasBaseUrl))
+    }
+  }
+
+  const handleClearCanvasImports = () => {
+    setClasses((prev) => prev.filter((cls) => cls.source !== "canvas"))
+    setCanvasImportedCount(0)
+    toast({
+      title: "Canvas classes removed",
+      description: "Canvas-synced classes have been cleared from your calculator.",
+    })
+  }
+
+  const applyDomainPreset = (url: string) => {
+    const normalized = normalizeCanvasBaseUrl(url)
+    setCanvasBaseUrl(normalized)
+  }
+
+  const handleCanvasSync = async () => {
+    const normalizedBase = normalizeCanvasBaseUrl(canvasBaseUrl)
+    if (!normalizedBase) {
+      toast({
+        title: "Canvas URL required",
+        description: "Enter your Canvas domain, e.g. school.instructure.com",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setCanvasBaseUrl(normalizedBase)
+
+    const token = canvasTokenToUse.trim()
+    if (!token) {
+      toast({
+        title: "Token missing",
+        description: "Paste a valid Canvas access token to fetch your grades.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsCanvasSyncing(true)
+    setCanvasSyncMessage(null)
+
+    try {
+      const { courses } = await fetchCanvasCoursesProxy(normalizedBase, token)
+
+      const mappedCourses = courses
+        .map((course) => {
+          const enrollment = pickStudentEnrollment(course.enrollments)
+          const score =
+            enrollment?.computed_current_score ??
+            enrollment?.grades?.current_score ??
+            enrollment?.computed_final_score ??
+            enrollment?.grades?.final_score
+
+          if (score === undefined || score === null || Number.isNaN(Number(score))) {
+            return null
+          }
+
+          const currentScore = Math.max(0, Math.min(100, Number(score)))
+          const color = colorOptions[Math.abs(course.id) % colorOptions.length]?.value ?? "bg-blue-500"
+          const target = getSuggestedTarget(currentScore)
+
+          return {
+            id: generateId(),
+            name: course.name || course.course_code || `Course ${course.id}`,
+            current: currentScore,
+            weight: canvasDefaultWeight,
+            target,
+            assignments: [],
+            color,
+            credits: 3,
+            source: "canvas",
+            canvasCourseId: course.id,
+            canvasCourseUrl: `${normalizedBase}/courses/${course.id}`,
+            lastSyncedAt: new Date().toISOString(),
+          } as GradeClass
+        })
+        .filter(Boolean) as GradeClass[]
+
+      if (mappedCourses.length === 0) {
+        setCanvasSyncMessage("No courses with grades were returned. Check that your token has the correct scopes.")
+        setCanvasImportedCount(0)
+        return
+      }
+
+      setClasses((prev) => {
+        const manualClasses = prev.filter((cls) => cls.source !== "canvas")
+        const existingCanvas = prev.filter((cls) => cls.source === "canvas")
+
+        const mergedCanvas = mappedCourses.map((incoming) => {
+          const existing = existingCanvas.find((cls) => cls.canvasCourseId === incoming.canvasCourseId)
+          if (existing) {
+            return {
+              ...existing,
+              ...incoming,
+              assignments: existing.assignments ?? [],
+              id: existing.id,
+            }
+          }
+          return incoming
+        })
+
+        return [...manualClasses, ...mergedCanvas]
+      })
+
+      setCanvasImportedCount(mappedCourses.length)
+      const now = new Date().toISOString()
+      setLastCanvasSync(now)
+      setCanvasSyncMessage(`Last sync imported ${mappedCourses.length} course${mappedCourses.length === 1 ? "" : "s"}.`)
+      toast({
+        title: "Canvas synced",
+        description: `Imported ${mappedCourses.length} course${mappedCourses.length === 1 ? "" : "s"} from Canvas.`,
+      })
+    } catch (error) {
+      // If proxy fails (e.g., not available in local dev), fall back to direct fetch and surface CORS guidance.
+      const fallbackMsg =
+        "Proxy not available. If you see a CORS error, build and run with Cloudflare Pages Functions (wrangler) or set NEXT_PUBLIC_CANVAS_PROXY_URL."
+      setCanvasSyncMessage(fallbackMsg)
+      toast({ title: "Canvas sync fallback", description: fallbackMsg })
+      try {
+        const { courses } = await fetchCanvasCourses(normalizedBase, token)
+        // Re-run mapping if direct fetch works (e.g., same-origin or permissive CORS)
+        const mappedCourses = courses
+          .map((course) => {
+            const enrollment = pickStudentEnrollment(course.enrollments)
+            const score =
+              enrollment?.computed_current_score ??
+              enrollment?.grades?.current_score ??
+              enrollment?.computed_final_score ??
+              enrollment?.grades?.final_score
+            if (score === undefined || score === null || Number.isNaN(Number(score))) return null
+            const currentScore = Math.max(0, Math.min(100, Number(score)))
+            const color = colorOptions[Math.abs(course.id) % colorOptions.length]?.value ?? "bg-blue-500"
+            const target = getSuggestedTarget(currentScore)
+            return {
+              id: generateId(),
+              name: course.name || course.course_code || `Course ${course.id}`,
+              current: currentScore,
+              weight: canvasDefaultWeight,
+              target,
+              assignments: [],
+              color,
+              credits: 3,
+              source: "canvas",
+              canvasCourseId: course.id,
+              canvasCourseUrl: `${normalizedBase}/courses/${course.id}`,
+              lastSyncedAt: new Date().toISOString(),
+            } as GradeClass
+          })
+          .filter(Boolean) as GradeClass[]
+
+        if (mappedCourses.length === 0) {
+          setCanvasSyncMessage(
+            "No courses with grades were returned. Check token scopes or use the proxy for accurate results.",
+          )
+          setCanvasImportedCount(0)
+          return
+        }
+
+        setClasses((prev) => {
+          const manualClasses = prev.filter((cls) => cls.source !== "canvas")
+          const existingCanvas = prev.filter((cls) => cls.source === "canvas")
+          const mergedCanvas = mappedCourses.map((incoming) => {
+            const existing = existingCanvas.find((cls) => cls.canvasCourseId === incoming.canvasCourseId)
+            if (existing) return { ...existing, ...incoming, assignments: existing.assignments ?? [], id: existing.id }
+            return incoming
+          })
+          return [...manualClasses, ...mergedCanvas]
+        })
+
+        setCanvasImportedCount(mappedCourses.length)
+        const now = new Date().toISOString()
+        setLastCanvasSync(now)
+        setCanvasSyncMessage(`Last sync imported ${mappedCourses.length} course${mappedCourses.length === 1 ? "" : "s"}.`)
+        toast({
+          title: "Canvas synced",
+          description: `Imported ${mappedCourses.length} course${mappedCourses.length === 1 ? "" : "s"} from Canvas.`,
+        })
+      } catch (innerErr) {
+        const message = innerErr instanceof Error ? innerErr.message : "Failed to sync with Canvas."
+        setCanvasSyncMessage(message)
+        toast({ title: "Canvas sync failed", description: message, variant: "destructive" })
+      }
+    } finally {
+      setIsCanvasSyncing(false)
+    }
   }
 
   const handleDownloadReport = async () => {
@@ -1767,6 +2018,166 @@ export default function GradeCalculator() {
                     onCheckedChange={(checked) => updateSettings({ customGradeBands: checked })}
                   />
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-md">
+            <CardHeader className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+              <div className="space-y-1">
+                <h3 className="text-lg font-medium">Canvas Sync</h3>
+                <p className="text-sm text-muted-foreground">
+                  Connect with Canvas using a personal access token to pull your current grades.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2 items-center">
+                <Badge variant="outline">Last sync: {formatLastSync(lastCanvasSync)}</Badge>
+                {canvasImportedCount > 0 && (
+                  <Badge className="bg-emerald-500">Imported {canvasImportedCount}</Badge>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Alert>
+                <ShieldCheck className="h-4 w-4" />
+                <AlertTitle>Token stays on this device</AlertTitle>
+                <AlertDescription>
+                  Your Canvas token is only used in your browser to call Canvas directly. Turn on "Remember token"
+                  if you want it stored in local storage.
+                </AlertDescription>
+              </Alert>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <Label className="text-sm">Presets:</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => applyDomainPreset("https://kentdenver.instructure.com")}
+                >
+                  Kent Denver
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => applyDomainPreset("https://canvas.instructure.com")}
+                >
+                  Canvas (instructure.com)
+                </Button>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="canvas-domain">Canvas domain</Label>
+                  <div className="flex items-center gap-2">
+                    <Globe2 className="h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="canvas-domain"
+                      value={canvasBaseUrl}
+                      onChange={(e) => setCanvasBaseUrl(e.target.value)}
+                      onBlur={handleCanvasBaseUrlBlur}
+                      placeholder="school.instructure.com"
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">Do not include /login or /api paths.</p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="canvas-token">Access token</Label>
+                  <div className="flex items-center gap-2">
+                    <KeyRound className="h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="canvas-token"
+                      type="password"
+                      value={canvasToken}
+                      onChange={(e) => setCanvasToken(e.target.value)}
+                      placeholder="Paste your Canvas token"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between gap-2 text-sm text-muted-foreground">
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        id="remember-canvas-token"
+                        checked={rememberCanvasToken}
+                        onCheckedChange={setRememberCanvasToken}
+                      />
+                      <Label htmlFor="remember-canvas-token" className="cursor-pointer">
+                        Remember token on this device
+                      </Label>
+                    </div>
+                    {persistedCanvasToken && !rememberCanvasToken && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setPersistedCanvasToken("")}
+                        className="text-xs"
+                      >
+                        Clear saved token
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="canvas-weight">Default final exam weight</Label>
+                  <Slider
+                    id="canvas-weight"
+                    min={5}
+                    max={80}
+                    step={1}
+                    value={[canvasDefaultWeight]}
+                    onValueChange={(value) => setCanvasDefaultWeight(value[0])}
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    Applied to imported classes. You can adjust weights after syncing.
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label>Status</Label>
+                  <div className="rounded-md border px-3 py-2 text-sm bg-muted/50">
+                    {isCanvasSyncing ? (
+                      <div className="flex items-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span>Syncing with Canvas...</span>
+                      </div>
+                    ) : canvasSyncMessage ? (
+                      <span>{canvasSyncMessage}</span>
+                    ) : (
+                      <span>Ready to sync</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-3">
+                <Button onClick={handleCanvasSync} disabled={isCanvasSyncing} className="flex items-center gap-2">
+                  {isCanvasSyncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                  <span>Sync from Canvas</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={handleClearCanvasImports}
+                  className="flex items-center gap-2"
+                  disabled={isCanvasSyncing}
+                >
+                  <Trash2 className="h-4 w-4" />
+                  <span>Remove Canvas classes</span>
+                </Button>
+              </div>
+
+              <div className="rounded-md border p-3 text-sm space-y-2">
+                <div className="font-medium">How to get your Canvas access token</div>
+                <ol className="list-decimal pl-4 space-y-1">
+                  <li>Sign in to your Canvas at your domain (e.g. kentdenver.instructure.com).</li>
+                  <li>Open <span className="font-medium">Account</span> → <span className="font-medium">Settings</span>.</li>
+                  <li>Find <span className="font-medium">Approved Integrations</span> and click <span className="font-medium">New Access Token</span> (or <span className="font-medium">+ New Token</span>).</li>
+                  <li>Give it a name and optional expiry, then create the token.</li>
+                  <li>Copy the token shown once and paste it in the field above.</li>
+                </ol>
+                <div className="text-xs text-muted-foreground">Tip: You can revoke the token anytime from the same page.</div>
               </div>
             </CardContent>
           </Card>
