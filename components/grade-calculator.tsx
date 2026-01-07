@@ -65,6 +65,7 @@ import EnhancedWhatIf from "@/components/enhanced-what-if"
 import GradeStatistics from "@/components/grade-statistics"
 import { ExportDialog } from "@/components/export-dialog"
 import { ShareDialog } from "@/components/share-dialog"
+import { LmsImportDialog } from "@/components/lms-import-dialog"
 import { MobileOptimizations, TouchOptimizations } from "@/components/mobile-optimizations"
 import { useLocalStorage } from "@/hooks/use-local-storage"
 import { exportToPdf } from "@/utils/export-utils"
@@ -294,6 +295,28 @@ export default function GradeCalculator() {
   const generateId = () => {
     return Math.random().toString(36).substring(2, 9)
   }
+
+  // Map data returned from the LMS API into the internal class format
+  const mapLmsClass = (cls: any): GradeClass => ({
+    id: generateId(),
+    name: cls.name || "Class",
+    current: cls.current ?? cls.currentGrade ?? 0,
+    weight: cls.weight ?? 100,
+    target: cls.target ?? "A",
+    color:
+      cls.color || colorOptions[Math.floor(Math.random() * colorOptions.length)].value,
+    credits: cls.credits,
+    assignments: Array.isArray(cls.assignments)
+      ? cls.assignments.map((a: any) => ({
+          id: generateId(),
+          name: a.name || "Assignment",
+          score: a.score ?? 0,
+          totalPoints: a.totalPoints ?? 100,
+          weight: a.weight ?? 0,
+          date: a.date || a.due,
+        }))
+      : [],
+  })
 
   const formatGrade = (grade: number): string => {
     return grade.toFixed(settings.showDecimalPlaces)
@@ -593,6 +616,11 @@ export default function GradeCalculator() {
 
     // Reset the input value so the same file can be imported again if needed
     event.target.value = ""
+  }
+
+  const importFromLms = (lmsClasses: any[]) => {
+    const mapped = lmsClasses.map(mapLmsClass)
+    setClasses([...classes, ...mapped])
   }
 
   const resetData = () => {
@@ -1241,6 +1269,9 @@ export default function GradeCalculator() {
                   Share
                 </Button>
               }
+            />
+            <LmsImportDialog
+              onImport={importFromLms}
             />
 
             <Button
@@ -2207,6 +2238,7 @@ export default function GradeCalculator() {
                     </Button>
                   }
                 />
+                <LmsImportDialog onImport={importFromLms} />
 
                 <Button variant="outline" className="flex items-center" onClick={handleDownloadReport}>
                   <FileDown className="w-4 h-4 mr-2" />
