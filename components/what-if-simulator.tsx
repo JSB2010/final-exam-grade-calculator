@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from "recharts"
 import { LightbulbIcon, Calculator, BarChart4, PieChart as PieChartIcon, Save, Sparkles, AlertTriangle } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import { calculateFinalGrade } from "@/utils/grade-math"
 import { motion } from "framer-motion"
 import { cn } from "@/lib/utils"
 import { GradeClass, GradeBand } from "@/types/grade-calculator"
@@ -40,11 +41,6 @@ export default function WhatIfSimulator({ classes, gradeBands, formatGrade }: Wh
   const [scenarios, setScenarios] = useState<WhatIfScenario[]>([])
   const [scenarioName, setScenarioName] = useState("My Scenario")
   const [activeTab, setActiveTab] = useState("simulator")
-  
-  // Calculate the resulting grade based on current grade, weight, and final exam score
-  const calculateFinalGrade = (current: number, weight: number, finalScore: number) => {
-    return current * (1 - weight / 100) + (finalScore * weight) / 100
-  }
   
   // Get the letter grade for a numeric grade
   const getLetterGrade = (grade: number) => {

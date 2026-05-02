@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Calculator, TrendingUp, Target, BarChart3, Lightbulb, Zap } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { calculateFinalGrade, calculateRequiredScore } from "@/utils/grade-math"
 
 interface GradeClass {
   id: string
@@ -40,12 +41,6 @@ export default function EnhancedWhatIf({ classes, gradeBands, formatGrade }: Rea
 
   const selectedClass = classes.find(cls => cls.id === selectedClassId)
 
-  const calculateFinalGrade = (current: number, weight: number, finalScore: number) => {
-    const currentWeight = (100 - weight) / 100
-    const finalWeight = weight / 100
-    return current * currentWeight + finalScore * finalWeight
-  }
-
   const getCurrentGradeBand = (grade: number) => {
     for (const band of gradeBands) {
       if (grade >= band.cutoff) {
@@ -55,13 +50,8 @@ export default function EnhancedWhatIf({ classes, gradeBands, formatGrade }: Rea
     return gradeBands[gradeBands.length - 1]
   }
 
-  const calculateRequiredScore = (current: number, weight: number, targetCutoff: number) => {
-    const currentWeight = (100 - weight) / 100
-    const finalWeight = weight / 100
-    return (targetCutoff - current * currentWeight) / finalWeight
-  }
-
   const getDifficulty = (score: number) => {
+    if (!Number.isFinite(score)) return "N/A"
     if (score > 95) return "Very Hard"
     if (score > 85) return "Hard"
     if (score > 70) return "Moderate"
@@ -92,15 +82,16 @@ export default function EnhancedWhatIf({ classes, gradeBands, formatGrade }: Rea
 
         const requiredScore = calculateRequiredScore(adjustedCurrent, selectedClass.weight, targetBand.cutoff)
         const finalGrade = calculateFinalGrade(adjustedCurrent, selectedClass.weight, finalExamScore)
-
-
+        const clampedRequired = Number.isFinite(requiredScore)
+          ? Math.max(0, Math.min(100, requiredScore))
+          : requiredScore
 
         return [{
           type: "Target Achievement",
           description: `To achieve ${targetGrade} (${targetBand.cutoff}%+)`,
-          requiredScore: Math.max(0, Math.min(100, requiredScore)),
+          requiredScore: clampedRequired,
           currentProjection: finalGrade,
-          achievable: requiredScore <= 100,
+          achievable: Number.isFinite(requiredScore) ? requiredScore <= 100 : false,
           difficulty: getDifficulty(requiredScore)
         }]
       }
@@ -112,12 +103,15 @@ export default function EnhancedWhatIf({ classes, gradeBands, formatGrade }: Rea
         return improvementLevels.map(improvement => {
           const targetScore = adjustedCurrent + improvement
           const requiredScore = calculateRequiredScore(adjustedCurrent, selectedClass.weight, targetScore)
+          const clampedRequired = Number.isFinite(requiredScore)
+            ? Math.max(0, Math.min(100, requiredScore))
+            : requiredScore
           return {
             type: "Grade Improvement",
             description: `Improve by ${improvement} points to ${formatGrade(targetScore)}%`,
-            requiredScore: Math.max(0, Math.min(100, requiredScore)),
+            requiredScore: clampedRequired,
             currentProjection: calculateFinalGrade(adjustedCurrent, selectedClass.weight, finalExamScore),
-            achievable: requiredScore <= 100,
+            achievable: Number.isFinite(requiredScore) ? requiredScore <= 100 : false,
             difficulty: getDifficulty(requiredScore)
           }
         })
@@ -158,6 +152,11 @@ export default function EnhancedWhatIf({ classes, gradeBands, formatGrade }: Rea
     if (scenario.difficulty === "Hard") return "bg-amber-100 border-amber-300 dark:bg-amber-900/20"
     if (scenario.difficulty === "Moderate") return "bg-blue-100 border-blue-300 dark:bg-blue-900/20"
     return "bg-green-100 border-green-300 dark:bg-green-900/20"
+  }
+
+  const formatRequiredScore = (score: number, achievable: boolean) => {
+    if (!Number.isFinite(score)) return "No final"
+    return achievable ? `${formatGrade(score)}%` : "Impossible"
   }
 
   const getDifficultyIcon = (difficulty: string) => {
@@ -432,7 +431,7 @@ export default function EnhancedWhatIf({ classes, gradeBands, formatGrade }: Rea
                     <div className="flex justify-between">
                       <span className="text-sm">Required Score:</span>
                       <span className="font-medium">
-                        {scenario.achievable ? `${formatGrade(scenario.requiredScore)}%` : "Impossible"}
+                        {formatRequiredScore(scenario.requiredScore, scenario.achievable)}
                       </span>
                     </div>
                     <div className="flex justify-between">

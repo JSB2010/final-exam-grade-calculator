@@ -69,6 +69,9 @@ import { MobileOptimizations, TouchOptimizations } from "@/components/mobile-opt
 import { useLocalStorage } from "@/hooks/use-local-storage"
 import { exportToPdf } from "@/utils/export-utils"
 import { fetchCanvasCourses, fetchCanvasCoursesProxy, normalizeCanvasBaseUrl, pickStudentEnrollment } from "@/utils/canvas-api"
+import { validateCanvasBaseUrl } from "@/utils/canvas-urls"
+import { calculateFinalGrade, calculateRequiredScore } from "@/utils/grade-math"
+import { parseAppSettings, parseGradeClasses, serializeAppSettings, serializeGradeClasses } from "@/utils/storage-schemas"
 
 // Define types
 type GradeClass = {
@@ -165,7 +168,10 @@ export default function GradeCalculator() {
       color: "bg-amber-500",
       credits: 3,
     },
-  ])
+  ], {
+    parse: parseGradeClasses,
+    serialize: serializeGradeClasses,
+  })
 
   const [settings, setSettings] = useLocalStorage<AppSettings>("grade-calculator-settings", {
     roundToWhole: true,
@@ -177,6 +183,9 @@ export default function GradeCalculator() {
     theme: "system",
     studyReminderEnabled: false,
     autoSaveEnabled: true
+  }, {
+    parse: parseAppSettings,
+    serialize: serializeAppSettings,
   })
 
   // Create a memoized function to update settings to prevent unnecessary re-renders
@@ -350,17 +359,19 @@ export default function GradeCalculator() {
 
   // Helper function to get target badge class
   const getTargetBadgeClass = (required: number): string => {
+    if (!Number.isFinite(required)) return "bg-slate-500"
     if (required > 100) return "bg-red-500"
     if (required > 90) return "bg-amber-500"
     if (required > 70) return "bg-green-500"
-    if (required === 0) return "bg-emerald-500"
+    if (required <= 0) return "bg-emerald-500"
     return "bg-blue-500"
   }
 
   // Helper function to get target badge text
   const getTargetBadgeText = (required: number): string => {
+    if (!Number.isFinite(required)) return "No final"
     if (required > 100) return "Impossible"
-    if (required === 0) return "Already achieved"
+    if (required <= 0) return "Already achieved"
     return `${formatGrade(required)}%`
   }
 
@@ -375,7 +386,7 @@ export default function GradeCalculator() {
   // Helper function to get achievable text
   const getAchievableText = (achievable: any): string => {
     if (!achievable) return "—"
-    if (achievable.required === 0) return "✓"
+    if (achievable.required <= 0) return "✓"
     return `${formatGrade(achievable.required)}%`
   }
 
@@ -492,13 +503,7 @@ export default function GradeCalculator() {
 
   // Updated to account for rounding when settings.roundToWhole is true
   const calcRequiredRaw = (current: number, weight: number, cutoff: number) => {
-    const w = weight / 100
-    if (w <= 0) return Number.POSITIVE_INFINITY
-
-    // If rounding is enabled, adjust the cutoff to account for rounding
-    const adjustedCutoff = settings.roundToWhole ? cutoff - 0.5 : cutoff
-
-    return (adjustedCutoff - (1 - w) * current) / w
+    return calculateRequiredScore(current, weight, cutoff, { roundToWhole: settings.roundToWhole })
   }
 
   const getRequiredGrades = (cls: GradeClass) => {
@@ -520,7 +525,7 @@ export default function GradeCalculator() {
     const required = calcRequiredRaw(cls.current, cls.weight, targetBand.cutoff)
     return {
       ...targetBand,
-      required: Math.ceil(Math.max(0, Math.min(100, required)) * 100) / 100,
+      required: Number.isFinite(required) ? Math.ceil(Math.max(0, required) * 100) / 100 : required,
     }
   }
 
@@ -605,7 +610,13 @@ export default function GradeCalculator() {
 
   const handleCanvasBaseUrlBlur = () => {
     if (canvasBaseUrl) {
-      setCanvasBaseUrl(normalizeCanvasBaseUrl(canvasBaseUrl))
+      const { normalized, error } = validateCanvasBaseUrl(canvasBaseUrl)
+      if (error) {
+        setCanvasSyncMessage(error)
+        return
+      }
+      setCanvasBaseUrl(normalized)
+      setCanvasSyncMessage(null)
     }
   }
 
@@ -624,11 +635,11 @@ export default function GradeCalculator() {
   }
 
   const handleCanvasSync = async () => {
-    const normalizedBase = normalizeCanvasBaseUrl(canvasBaseUrl)
-    if (!normalizedBase) {
+    const { normalized: normalizedBase, error } = validateCanvasBaseUrl(canvasBaseUrl)
+    if (error || !normalizedBase) {
       toast({
-        title: "Canvas URL required",
-        description: "Enter your Canvas domain, e.g. school.instructure.com",
+        title: "Canvas URL invalid",
+        description: error || "Enter your Canvas domain, e.g. school.instructure.com",
         variant: "destructive",
       })
       return
@@ -908,8 +919,16 @@ export default function GradeCalculator() {
     const targetGrade = getTargetGrade(cls)
     if (!targetGrade) return "No target set"
 
+    if (!Number.isFinite(targetGrade.required)) {
+      return "Final exam weight is 0%"
+    }
+
     if (targetGrade.required > 100) {
       return "Not achievable"
+    }
+
+    if (targetGrade.required <= 0) {
+      return "Already achieved"
     }
     return `Needs ${formatGrade(targetGrade.required)}% on final`
   }
@@ -1160,11 +1179,6 @@ export default function GradeCalculator() {
       }
     })
   }, [classes, gradeBands, settings.roundToWhole])
-
-  // Calculate final grade based on current grade, weight, and final exam score
-  const calculateFinalGrade = (current: number, weight: number, finalScore: number) => {
-    return current * (1 - weight / 100) + (finalScore * weight) / 100
-  }
 
   // Single useEffect to handle resize events for charts
   useEffect(() => {

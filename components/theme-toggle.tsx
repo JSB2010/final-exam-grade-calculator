@@ -4,9 +4,12 @@ import { useEffect, useState } from "react"
 import { Moon, Sun } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useLocalStorage } from "@/hooks/use-local-storage"
+import { parseTheme } from "@/utils/storage-schemas"
 
 export function ThemeToggle() {
-  const [theme, setTheme] = useLocalStorage<"light" | "dark" | "system">("theme", "system")
+  const [theme, setTheme] = useLocalStorage<"light" | "dark" | "system">("theme", "system", {
+    parse: parseTheme,
+  })
   const [mounted, setMounted] = useState(false)
 
   // Ensure component is mounted before rendering to avoid hydration mismatch

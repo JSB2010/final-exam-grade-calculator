@@ -1,12 +1,22 @@
+import { buildCanvasCoursesUrl, parseLinkHeader, validateCanvasBaseUrl } from "../../../utils/canvas-urls"
+
 export const onRequestPost: PagesFunction = async (context) => {
   try {
     const { request } = context
     const body = await request.json()
-    const baseUrl = (body?.baseUrl || "").toString().trim().replace(/\/$/, "")
-    const token = (body?.token || "").toString()
+    const baseUrl = (body?.baseUrl || "").toString()
+    const token = (body?.token || "").toString().trim()
+    const allowHostsEnv =
+      typeof (context as any)?.env?.CANVAS_ALLOWED_HOSTS === "string"
+        ? (context as any).env.CANVAS_ALLOWED_HOSTS
+        : ""
+    const allowHosts = allowHostsEnv
+      ? allowHostsEnv.split(",").map((entry: string) => entry.trim()).filter(Boolean)
+      : undefined
+    const { normalized: normalizedBaseUrl, error: baseUrlError } = validateCanvasBaseUrl(baseUrl, { allowHosts })
 
-    if (!baseUrl || !token) {
-      return new Response(JSON.stringify({ error: "Missing baseUrl or token" }), {
+    if (baseUrlError || !token) {
+      return new Response(JSON.stringify({ error: baseUrlError || "Missing token" }), {
         status: 400,
         headers: { "content-type": "application/json" },
       })
@@ -17,7 +27,7 @@ export const onRequestPost: PagesFunction = async (context) => {
       Accept: "application/json",
     }
 
-    let url = `${baseUrl}/api/v1/courses?enrollment_state=active&include[]=total_scores&include[]=enrollments&per_page=50`
+    let url = buildCanvasCoursesUrl(normalizedBaseUrl)
     const courses: unknown[] = []
     let page = 0
 
@@ -62,14 +72,4 @@ export const onRequestGet: PagesFunction = async () => {
     }),
     { status: 200, headers: { "content-type": "application/json" } },
   )
-}
-
-function parseLinkHeader(header: string | null): string | null {
-  if (!header) return null
-  const parts = header.split(",")
-  for (const part of parts) {
-    const match = part.match(/<([^>]+)>;\s*rel=\"next\"/)
-    if (match && match[1]) return match[1]
-  }
-  return null
 }

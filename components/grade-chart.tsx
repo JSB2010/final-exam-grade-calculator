@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import { Label } from "@/components/ui/label"
+import { calculateFinalGrade, normalizeWeight } from "@/utils/grade-math"
 
 type GradeBand = {
   label: string
@@ -142,11 +143,11 @@ export default function GradeChart({ currentGrade, finalWeight, gradeBands }: Re
       }
 
       // Calculate and draw the final grade line
-      const w = finalWeight / 100
+      const w = normalizeWeight(finalWeight) / 100
       ctx.beginPath()
 
       for (let x = 0; x <= 100; x++) {
-        const finalGrade = currentGrade * (1 - w) + x * w
+        const finalGrade = calculateFinalGrade(currentGrade, finalWeight, x)
         const chartX = padding.left + (x / 100) * chartWidth
         const chartY = padding.top + chartHeight - (finalGrade / 100) * chartHeight
 
@@ -182,7 +183,7 @@ export default function GradeChart({ currentGrade, finalWeight, gradeBands }: Re
       const targetScores = [60, 70, 80, 90, 100]
 
       targetScores.forEach((score) => {
-        const finalGrade = currentGrade * (1 - w) + score * w
+        const finalGrade = calculateFinalGrade(currentGrade, finalWeight, score)
         const targetX = padding.left + (score / 100) * chartWidth
         const targetY = padding.top + chartHeight - (finalGrade / 100) * chartHeight
 

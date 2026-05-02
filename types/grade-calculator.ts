@@ -36,6 +36,8 @@ export type AppSettings = {
   customGradeBands?: boolean
   gradingSystem?: "letter" | "percentage" | "gpa"
   theme?: "light" | "dark" | "system"
+  studyReminderEnabled?: boolean
+  autoSaveEnabled?: boolean
 }
 
 export type TargetGrade = GradeBand & {

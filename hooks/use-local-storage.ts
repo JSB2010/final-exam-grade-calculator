@@ -2,12 +2,32 @@
 
 import { useState, useEffect, useCallback, useRef } from "react"
 
-export function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T) => void] {
+type LocalStorageOptions<T> = {
+  parse?: (value: unknown, fallback: T) => T
+  serialize?: (value: T) => string
+}
+
+export function useLocalStorage<T>(
+  key: string,
+  initialValue: T,
+  options?: LocalStorageOptions<T>,
+): [T, (value: T) => void] {
   // Create a state variable to track if we're mounted
   const [mounted, setMounted] = useState(false)
 
   // Use a ref to track the current value to avoid dependency issues
   const valueRef = useRef<T>(initialValue)
+  const initialValueRef = useRef<T>(initialValue)
+  const optionsRef = useRef<LocalStorageOptions<T> | undefined>(options)
+
+  useEffect(() => {
+    optionsRef.current = options
+  }, [options])
+
+  const parseValue = useCallback((value: unknown) => {
+    const parser = optionsRef.current?.parse
+    return parser ? parser(value, initialValueRef.current) : (value as T)
+  }, [])
 
   // State to store our value
   const [storedValue, setStoredValue] = useState<T>(initialValue)
@@ -19,20 +39,21 @@ export function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T)
       // Get from local storage by key
       const item = localStorage.getItem(key)
       // Parse stored json or if none return initialValue
-      const parsedItem = item ? JSON.parse(item) : initialValue
+      const parsedItem = item ? JSON.parse(item) : initialValueRef.current
+      const normalizedItem = parseValue(parsedItem)
 
       // Only update state if the value is different
-      if (JSON.stringify(parsedItem) !== JSON.stringify(valueRef.current)) {
-        setStoredValue(parsedItem)
-        valueRef.current = parsedItem
+      if (JSON.stringify(normalizedItem) !== JSON.stringify(valueRef.current)) {
+        setStoredValue(normalizedItem)
+        valueRef.current = normalizedItem
       }
     } catch (error) {
       // If error also return initialValue
       console.error("Error reading from localStorage:", error)
-      setStoredValue(initialValue)
-      valueRef.current = initialValue
+      setStoredValue(initialValueRef.current)
+      valueRef.current = initialValueRef.current
     }
-  }, [key]) // Remove initialValue from dependencies to prevent re-renders
+  }, [key, parseValue]) // Remove initialValue from dependencies to prevent re-renders
 
   // Return a wrapped version of useState's setter function that
   // persists the new value to localStorage.
@@ -49,7 +70,9 @@ export function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T)
 
         // Save to local storage
         if (mounted) {
-          localStorage.setItem(key, JSON.stringify(valueToStore))
+          const serializer = optionsRef.current?.serialize
+          const serializedValue = serializer ? serializer(valueToStore) : JSON.stringify(valueToStore)
+          localStorage.setItem(key, serializedValue)
         }
       }
     } catch (error) {
@@ -65,10 +88,11 @@ export function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T)
     function handleStorageChange(e: StorageEvent) {
       if (e.key === key && e.newValue) {
         try {
-          const newValue = JSON.parse(e.newValue)
-          if (JSON.stringify(newValue) !== JSON.stringify(valueRef.current)) {
-            setStoredValue(newValue)
-            valueRef.current = newValue
+          const rawValue = JSON.parse(e.newValue)
+          const parsedValue = parseValue(rawValue)
+          if (JSON.stringify(parsedValue) !== JSON.stringify(valueRef.current)) {
+            setStoredValue(parsedValue)
+            valueRef.current = parsedValue
           }
         } catch (error) {
           console.error("Error parsing localStorage change:", error)
@@ -83,7 +107,7 @@ export function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T)
     return () => {
       window.removeEventListener("storage", handleStorageChange)
     }
-  }, [key, mounted])
+  }, [key, mounted, parseValue])
 
   return [storedValue, setValue]
 }

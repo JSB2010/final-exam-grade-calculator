@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import {
   Dialog,
   DialogContent,
@@ -14,18 +14,17 @@ import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Copy, Mail, Share2, CloudIcon } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
-import { exportToCloud } from "@/utils/cloud-export-utils"
-import type { GradeClass } from "@/types/grade-calculator"
+import type { AppSettings, GradeClass } from "@/types/grade-calculator"
+import { buildSharePayload, encodeShareData } from "@/utils/share-data"
 
 interface ShareDialogProps {
   data: {
     classes: GradeClass[]
-    settings?: any
+    settings?: AppSettings
   }
   trigger?: React.ReactNode
 }
@@ -39,23 +38,23 @@ export function ShareDialog({ data, trigger }: ShareDialogProps) {
   const [includeSettings, setIncludeSettings] = useState(true)
   const [isSharing, setIsSharing] = useState(false)
   const [shareUrl, setShareUrl] = useState("")
-  const [cloudService, setCloudService] = useState<'google-drive' | 'dropbox' | 'onedrive'>('google-drive')
+  useEffect(() => {
+    setShareUrl("")
+  }, [includeSettings])
+
+  const buildShareUrl = () => {
+    const payload = buildSharePayload({
+      classes: data.classes,
+      ...(includeSettings && data.settings ? { settings: data.settings } : {}),
+    })
+    const encoded = encodeShareData(payload)
+    return `${window.location.origin}/shared?data=${encoded}`
+  }
 
   const handleGenerateLink = async () => {
     try {
       setIsSharing(true)
-
-      // In a real implementation, this would create a shareable link by:
-      // 1. Uploading the data to a server
-      // 2. Generating a unique ID
-      // 3. Creating a URL with that ID
-
-      // For now, we'll simulate this with a timeout
-      await new Promise(resolve => setTimeout(resolve, 1000))
-
-      const shareId = Math.random().toString(36).substring(2, 15)
-      const generatedUrl = `${window.location.origin}/shared/${shareId}`
-
+      const generatedUrl = buildShareUrl()
       setShareUrl(generatedUrl)
 
       toast({
@@ -88,16 +87,13 @@ export function ShareDialog({ data, trigger }: ShareDialogProps) {
     try {
       setIsSharing(true)
 
-      // In a real implementation, this would:
-      // 1. Upload the data to a server
-      // 2. Send an email with a link to the data
-
-      // For now, we'll simulate this with a timeout
-      await new Promise(resolve => setTimeout(resolve, 1000))
-
       // Open the default email client
       const subject = "Grade Calculator Data"
-      const body = `${message}\n\nView my grades here: ${shareUrl || "https://example.com/shared/demo"}`
+      const generatedUrl = shareUrl || buildShareUrl()
+      if (!shareUrl) {
+        setShareUrl(generatedUrl)
+      }
+      const body = `${message}\n\nView my grades here: ${generatedUrl}`
 
       window.location.href = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
 
@@ -114,42 +110,6 @@ export function ShareDialog({ data, trigger }: ShareDialogProps) {
         description: "There was an error preparing your email. Please try again.",
         variant: "destructive",
       })
-    } finally {
-      setIsSharing(false)
-    }
-  }
-
-  const handleCloudShare = async () => {
-    try {
-      setIsSharing(true)
-
-      const exportData = {
-        classes: data.classes,
-        ...(includeSettings && data.settings ? { settings: data.settings } : {}),
-      }
-
-      const filename = `grade-calculator-export-${new Date().toISOString().slice(0, 10)}.json`
-
-      const url = await exportToCloud({
-        filename,
-        data: exportData,
-        service: cloudService,
-        shareOptions: {
-          email: email || undefined,
-          message: message || undefined,
-          public: false,
-        }
-      })
-
-      setShareUrl(url)
-
-      toast({
-        title: "Shared to cloud",
-        description: `Your data has been exported to ${cloudService === 'google-drive' ? 'Google Drive' : cloudService === 'dropbox' ? 'Dropbox' : 'OneDrive'}.`,
-      })
-    } catch (error) {
-      console.error("Error sharing to cloud:", error)
-      // Toast is already handled in the exportToCloud function
     } finally {
       setIsSharing(false)
     }
@@ -188,6 +148,9 @@ export function ShareDialog({ data, trigger }: ShareDialogProps) {
           </TabsList>
 
           <TabsContent value="link" className="space-y-4">
+            <p className="text-xs text-muted-foreground">
+              Share links include your data directly in the URL. Only send them to people you trust.
+            </p>
             <div className="space-y-2">
               <div className="flex items-center space-x-2">
                 <Checkbox
@@ -219,6 +182,9 @@ export function ShareDialog({ data, trigger }: ShareDialogProps) {
           </TabsContent>
 
           <TabsContent value="email" className="space-y-4">
+            <p className="text-xs text-muted-foreground">
+              We will open your email client with a share link that includes your data.
+            </p>
             <div className="space-y-2">
               <Label htmlFor="email">Recipient Email</Label>
               <Input
@@ -257,59 +223,9 @@ export function ShareDialog({ data, trigger }: ShareDialogProps) {
           </TabsContent>
 
           <TabsContent value="cloud" className="space-y-4">
-            <div className="space-y-2">
-              <Label>Cloud Service</Label>
-              <RadioGroup value={cloudService} onValueChange={(value) => setCloudService(value as any)}>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="google-drive" id="cloud-gdrive" />
-                  <Label htmlFor="cloud-gdrive" className="flex items-center gap-2 cursor-pointer">
-                    <CloudIcon className="h-4 w-4" />
-                    Google Drive
-                  </Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="dropbox" id="cloud-dropbox" />
-                  <Label htmlFor="cloud-dropbox" className="flex items-center gap-2 cursor-pointer">
-                    <CloudIcon className="h-4 w-4" />
-                    Dropbox
-                  </Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="onedrive" id="cloud-onedrive" />
-                  <Label htmlFor="cloud-onedrive" className="flex items-center gap-2 cursor-pointer">
-                    <CloudIcon className="h-4 w-4" />
-                    OneDrive
-                  </Label>
-                </div>
-              </RadioGroup>
+            <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
+              Cloud integrations are not configured yet. Use a share link or export from the calculator instead.
             </div>
-
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="include-settings-cloud"
-                checked={includeSettings}
-                onCheckedChange={(checked) => setIncludeSettings(!!checked)}
-              />
-              <Label htmlFor="include-settings-cloud" className="cursor-pointer">
-                Include settings in shared data
-              </Label>
-            </div>
-
-            <Button onClick={handleCloudShare} disabled={isSharing} className="w-full">
-              {isSharing ? "Exporting..." : `Export to ${cloudService === 'google-drive' ? 'Google Drive' : cloudService === 'dropbox' ? 'Dropbox' : 'OneDrive'}`}
-            </Button>
-
-            {shareUrl && (
-              <div className="space-y-2">
-                <Label htmlFor="cloud-url">Cloud Link</Label>
-                <div className="flex gap-2">
-                  <Input id="cloud-url" value={shareUrl} readOnly className="flex-1" />
-                  <Button onClick={handleCopyLink} size="sm">
-                    <Copy className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            )}
           </TabsContent>
         </Tabs>
 

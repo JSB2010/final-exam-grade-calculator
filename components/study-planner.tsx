@@ -17,17 +17,7 @@ import { CalendarIcon, Clock, GraduationCap, Plus, Trash2, CheckCircle2 } from "
 import { useLocalStorage } from "@/hooks/use-local-storage"
 import { useToast } from "@/hooks/use-toast"
 import { motion, AnimatePresence } from "framer-motion"
-
-type StudySession = {
-  id: string
-  title: string
-  classId: string
-  date: Date
-  duration: number
-  completed: boolean
-  notes?: string
-  priority: "low" | "medium" | "high"
-}
+import { parseStudySessions, type StudySession } from "@/utils/storage-schemas"
 
 type StudyPlannerProps = {
   classes: Array<{
@@ -39,7 +29,9 @@ type StudyPlannerProps = {
 
 export default function StudyPlanner({ classes }: StudyPlannerProps) {
   const { toast } = useToast()
-  const [studySessions, setStudySessions] = useLocalStorage<StudySession[]>("study-planner-sessions", [])
+  const [studySessions, setStudySessions] = useLocalStorage<StudySession[]>("study-planner-sessions", [], {
+    parse: parseStudySessions,
+  })
   const [date, setDate] = useState<Date>(new Date())
   const [activeTab, setActiveTab] = useState("upcoming")
   

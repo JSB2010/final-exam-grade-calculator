@@ -1,3 +1,7 @@
+import { buildCanvasCoursesUrl, normalizeCanvasBaseUrl, parseLinkHeader } from "@/utils/canvas-urls"
+
+export { normalizeCanvasBaseUrl } from "@/utils/canvas-urls"
+
 export type CanvasEnrollment = {
   type?: string
   role?: string
@@ -27,28 +31,6 @@ export type CanvasFetchResult = {
 
 const MAX_PAGES = 4
 
-const parseLinkHeader = (header: string | null): string | null => {
-  if (!header) return null
-  const parts = header.split(",")
-  for (const part of parts) {
-    const match = part.match(/<([^>]+)>;\s*rel="next"/)
-    if (match && match[1]) {
-      return match[1]
-    }
-  }
-  return null
-}
-
-export const normalizeCanvasBaseUrl = (raw: string): string => {
-  if (!raw) return ""
-  const trimmed = raw.trim().replace(/\/$/, "")
-  if (!trimmed) return ""
-  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
-    return trimmed
-  }
-  return `https://${trimmed}`
-}
-
 export const fetchCanvasCourses = async (
   baseUrl: string,
   token: string,
@@ -62,7 +44,7 @@ export const fetchCanvasCourses = async (
     throw new Error("Canvas token is required")
   }
 
-  let url = `${normalizedBase}/api/v1/courses?enrollment_state=active&include[]=total_scores&include[]=enrollments&per_page=50`
+  let url = buildCanvasCoursesUrl(normalizedBase)
   const courses: CanvasCourse[] = []
   let page = 0
 

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -12,17 +12,7 @@ import { useLocalStorage } from "@/hooks/use-local-storage"
 import { useToast } from "@/hooks/use-toast"
 import { motion } from "framer-motion"
 import { GradeClass } from "@/types/grade-calculator"
-
-type GradeSnapshot = {
-  id: string
-  date: string
-  classes: Array<{
-    id: string
-    name: string
-    grade: number
-    color: string
-  }>
-}
+import { parseGradeSnapshots, type GradeSnapshot } from "@/utils/storage-schemas"
 
 type GradeHistoryProps = {
   classes: GradeClass[]
@@ -31,7 +21,9 @@ type GradeHistoryProps = {
 
 export default function GradeHistory({ classes, formatGrade }: GradeHistoryProps) {
   const { toast } = useToast()
-  const [snapshots, setSnapshots] = useLocalStorage<GradeSnapshot[]>("grade-history-snapshots", [])
+  const [snapshots, setSnapshots] = useLocalStorage<GradeSnapshot[]>("grade-history-snapshots", [], {
+    parse: parseGradeSnapshots,
+  })
   const [selectedClassId, setSelectedClassId] = useState<string | null>(
     classes.length > 0 ? classes[0].id : null
   )
