@@ -1,8 +1,17 @@
+import type { Metadata } from 'next'
 import { ThemeToggle } from "@/components/theme-toggle"
 import { BookOpen, Calculator, GraduationCap, LineChart, Target, BarChart3, Lightbulb, Smartphone } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { UnifiedFooter } from "@/components/unified-footer"
+
+export const metadata: Metadata = {
+  title: 'Final Exam Grade Calculator – What Do I Need on My Final?',
+  description: 'Free final exam grade calculator for students. Find out exactly what score you need on your final exam to reach your target grade. Supports multiple classes, weighted finals, and Canvas LMS.',
+  alternates: {
+    canonical: 'https://finalscalc.com',
+  },
+}
 
 export default function Home() {
   return (
@@ -33,10 +42,10 @@ export default function Home() {
       <div className="container mx-auto py-12 px-4 relative z-10">
         <div className="max-w-4xl mx-auto mb-16 text-center">
           <h1 className="text-4xl md:text-6xl font-bold mb-6 gradient-heading animate-in">
-            FinalsCalc
+            Final Exam Grade Calculator
           </h1>
           <p className="text-xl md:text-2xl text-muted-foreground mb-8 max-w-2xl mx-auto">
-            Calculate exactly what you need on your finals to achieve your target grades. Now with advanced analytics, what-if scenarios, and mobile support.
+            Find out exactly what you need on your final exam to hit your target grades — instantly, free, and for all your classes at once.
           </p>
           <div className="flex flex-wrap gap-4 justify-center">
             <Button size="lg" className="gap-2" asChild>

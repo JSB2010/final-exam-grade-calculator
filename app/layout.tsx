@@ -8,9 +8,12 @@ import { Toaster } from '@/components/ui/toaster'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'FinalsCalc',
-  description: 'FinalsCalc shows what you need on your finals to hit your target grades',
-  generator: 'v0.dev',
+  metadataBase: new URL('https://finalscalc.com'),
+  title: {
+    default: 'Final Exam Grade Calculator – What Do I Need on My Final? | FinalsCalc',
+    template: '%s | FinalsCalc',
+  },
+  description: 'Free final exam grade calculator. Enter your current grade, target grade, and exam weight to instantly find out what score you need on your final. Works for multiple classes.',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
@@ -23,13 +26,14 @@ export const metadata: Metadata = {
   openGraph: {
     type: 'website',
     siteName: 'FinalsCalc',
-    title: 'FinalsCalc',
-    description: 'FinalsCalc shows what you need on your finals to hit your target grades',
+    title: 'Final Exam Grade Calculator – What Do I Need on My Final? | FinalsCalc',
+    description: 'Free final exam grade calculator. Enter your current grade, target grade, and exam weight to instantly find out what score you need on your final. Works for multiple classes.',
+    url: 'https://finalscalc.com',
   },
   twitter: {
-    card: 'summary',
-    title: 'FinalsCalc',
-    description: 'FinalsCalc shows what you need on your finals to hit your target grades',
+    card: 'summary_large_image',
+    title: 'Final Exam Grade Calculator – What Do I Need on My Final? | FinalsCalc',
+    description: 'Free final exam grade calculator. Enter your current grade, target grade, and exam weight to instantly find out what score you need on your final. Works for multiple classes.',
   },
 }
 
