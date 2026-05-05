@@ -6,7 +6,8 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  output: 'export',
+  // Use the default output so API routes work on Cloudflare Pages
+  output: 'standalone',
   reactStrictMode: true,
   compress: true,
   experimental: {
