@@ -54,3 +54,9 @@ test("CSV quotes commas, double quotes and newlines, and exports empty sets with
   assert.equal(buildCsv([], ["name", "score"]), "name,score")
   assert.equal(buildCsv([{ name: "=2+2" }]), "name\r\n'=2+2")
 })
+
+
+test("legacy minus targets match the calculator's displayed letter grades", async () => {
+  const { parseGradeClasses } = await import("../utils/storage-schemas.ts")
+  assert.equal(parseGradeClasses([{ ...sample, target: "A-" }], [])[0].target, "A−")
+})

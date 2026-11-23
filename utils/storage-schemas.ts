@@ -17,7 +17,7 @@ const gradeClassSchema = z.object({
   name: z.string(),
   current: z.coerce.number(),
   weight: z.coerce.number(),
-  target: z.string(),
+  target: z.string().transform((label) => /^[A-F]-$/.test(label) ? label[0] + "−" : label),
   assignments: z.array(assignmentSchema).default([]),
   color: z.string(),
   credits: z.coerce.number().optional(),

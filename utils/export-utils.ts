@@ -119,12 +119,17 @@ export const exportToPng = async (element: HTMLElement, options: ExportOptions =
       allowTaint: true,
     })
 
-    const dataUrl = canvas.toDataURL("image/png")
-
+    const image = await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error("Unable to render the PNG.")), "image/png")
+    })
+    const url = URL.createObjectURL(image)
     const linkElement = document.createElement("a")
-    linkElement.setAttribute("href", dataUrl)
-    linkElement.setAttribute("download", filename.endsWith(".png") ? filename : `${filename}.png`)
+    linkElement.href = url
+    linkElement.download = filename.endsWith(".png") ? filename : `${filename}.png`
+    document.body.appendChild(linkElement)
     linkElement.click()
+    linkElement.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 30_000)
   } catch (error) {
     console.error("Error exporting to PNG:", error)
     throw error

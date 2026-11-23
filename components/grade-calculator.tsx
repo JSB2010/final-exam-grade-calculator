@@ -69,6 +69,7 @@ import { MobileOptimizations, TouchOptimizations } from "@/components/mobile-opt
 import { useLocalStorage } from "@/hooks/use-local-storage"
 import { exportToPdf } from "@/utils/export-utils"
 import { importCanvasCourses, normalizeCanvasBaseUrl, pickStudentEnrollment } from "@/utils/canvas-api"
+import { mergeCanvasClasses } from "@/utils/canvas-class-sync"
 import { validateCanvasBaseUrl } from "@/utils/canvas-urls"
 import {
   applyFinalGradeRounding,
@@ -169,7 +170,7 @@ export default function GradeCalculator() {
       name: "Spanish",
       current: 88.25,
       weight: 15,
-      target: "A-",
+      target: "A−",
       assignments: [],
       color: "bg-amber-500",
       credits: 3,
@@ -671,24 +672,7 @@ export default function GradeCalculator() {
         return
       }
 
-      setClasses((prev) => {
-        const manualClasses = prev.filter((cls) => cls.source !== "canvas")
-        const existingCanvas = prev.filter((cls) => cls.source === "canvas")
-
-        const mergedCanvas = mappedCourses.map((incoming) => {
-          const existing = existingCanvas.find((cls) => cls.canvasCourseUrl === incoming.canvasCourseUrl)
-          if (existing) {
-            return {
-              ...existing,
-              current: incoming.current,
-              lastSyncedAt: incoming.lastSyncedAt,
-            }
-          }
-          return incoming
-        })
-
-        return [...manualClasses, ...mergedCanvas]
-      })
+      setClasses((prev) => mergeCanvasClasses(prev, mappedCourses))
 
       setCanvasImportedCount(mappedCourses.length)
       const now = new Date().toISOString()
