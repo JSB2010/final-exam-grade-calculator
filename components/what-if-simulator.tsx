@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from "recharts"
-import { LightbulbIcon, Calculator, BarChart4, PieChart as PieChartIcon, Save, Sparkles, AlertTriangle } from "lucide-react"
+import { LightbulbIcon, Calculator, BarChart4, PieChart as PieChartIcon, Save, Sparkles, AlertTriangle, Trash2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { calculateFinalGrade } from "@/utils/grade-math"
 import { motion } from "framer-motion"
@@ -363,7 +363,7 @@ export default function WhatIfSimulator({ classes, gradeBands, formatGrade }: Wh
                             outerRadius={80}
                             paddingAngle={2}
                             dataKey="value"
-                            label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                            label={({ name, percent }) => `${name} (${((percent ?? 0) * 100).toFixed(0)}%)`}
                             labelLine={false}
                           >
                             {pieData.map((entry, index) => (

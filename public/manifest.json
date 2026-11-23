@@ -9,7 +9,11 @@
   "orientation": "portrait-primary",
   "scope": "/",
   "lang": "en",
-  "categories": ["education", "productivity", "utilities"],
+  "categories": [
+    "education",
+    "productivity",
+    "utilities"
+  ],
   "icons": [
     {
       "src": "/icon-192x192.png",
@@ -27,48 +31,6 @@
       "src": "/apple-touch-icon.png",
       "sizes": "180x180",
       "type": "image/png"
-    }
-  ],
-  "screenshots": [
-    {
-      "src": "/screenshot-wide.png",
-      "sizes": "1280x720",
-      "type": "image/png",
-      "form_factor": "wide",
-      "label": "FinalsCalc - Desktop View"
-    },
-    {
-      "src": "/screenshot-narrow.png",
-      "sizes": "390x844",
-      "type": "image/png",
-      "form_factor": "narrow",
-      "label": "FinalsCalc - Mobile View"
-    }
-  ],
-  "shortcuts": [
-    {
-      "name": "Add New Class",
-      "short_name": "Add Class",
-      "description": "Quickly add a new class to track",
-      "url": "/calculator?action=add",
-      "icons": [
-        {
-          "src": "/icon-192x192.png",
-          "sizes": "192x192"
-        }
-      ]
-    },
-    {
-      "name": "View Statistics",
-      "short_name": "Statistics",
-      "description": "View grade statistics and analysis",
-      "url": "/calculator?tab=statistics",
-      "icons": [
-        {
-          "src": "/icon-192x192.png",
-          "sizes": "192x192"
-        }
-      ]
     }
   ],
   "prefer_related_applications": false,

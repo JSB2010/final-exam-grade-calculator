@@ -68,10 +68,16 @@ import { ShareDialog } from "@/components/share-dialog"
 import { MobileOptimizations, TouchOptimizations } from "@/components/mobile-optimizations"
 import { useLocalStorage } from "@/hooks/use-local-storage"
 import { exportToPdf } from "@/utils/export-utils"
-import { fetchCanvasCourses, fetchCanvasCoursesProxy, normalizeCanvasBaseUrl, pickStudentEnrollment } from "@/utils/canvas-api"
+import { importCanvasCourses, normalizeCanvasBaseUrl, pickStudentEnrollment } from "@/utils/canvas-api"
 import { validateCanvasBaseUrl } from "@/utils/canvas-urls"
-import { calculateFinalGrade, calculateRequiredScore } from "@/utils/grade-math"
-import { parseAppSettings, parseGradeClasses, serializeAppSettings, serializeGradeClasses } from "@/utils/storage-schemas"
+import {
+  applyFinalGradeRounding,
+  calculateFinalGrade,
+  calculateRequiredScore,
+  formatRequiredScore,
+  getGradeBand,
+} from "@/utils/grade-math"
+import { parseAppSettings, parseGradeBackup, parseGradeClasses, serializeAppSettings, serializeGradeClasses } from "@/utils/storage-schemas"
 
 // Define types
 type GradeClass = {
@@ -216,7 +222,7 @@ export default function GradeCalculator() {
     "grade-calculator-canvas-token",
     "",
   )
-  const [canvasToken, setCanvasToken] = useState<string>("")
+  const [canvasToken, setCanvasToken] = useState<string | null>(null)
   const [lastCanvasSync, setLastCanvasSync] = useLocalStorage<string | null>(
     "grade-calculator-canvas-last-sync",
     null,
@@ -254,20 +260,6 @@ export default function GradeCalculator() {
     }
   }, [activeTab, classes, lastInsightsClassId, selectedClassId])
 
-  useEffect(() => {
-    if (rememberCanvasToken && persistedCanvasToken && !canvasToken) {
-      setCanvasToken(persistedCanvasToken)
-    }
-  }, [rememberCanvasToken, persistedCanvasToken, canvasToken])
-
-  useEffect(() => {
-    if (rememberCanvasToken) {
-      setPersistedCanvasToken(canvasToken)
-    } else if (persistedCanvasToken) {
-      setPersistedCanvasToken("")
-    }
-  }, [rememberCanvasToken, canvasToken, persistedCanvasToken, setPersistedCanvasToken])
-
   const gradeBands: GradeBand[] = [
     { label: "A+", cutoff: 97, color: "bg-emerald-500" },
     { label: "A", cutoff: 93, color: "bg-emerald-400" },
@@ -297,7 +289,7 @@ export default function GradeCalculator() {
     { name: "Emerald", value: "bg-emerald-500" },
   ]
 
-  const canvasTokenToUse = rememberCanvasToken ? canvasToken || persistedCanvasToken : canvasToken
+  const canvasTokenToUse = canvasToken ?? (rememberCanvasToken ? persistedCanvasToken : "")
 
   // Generate a unique ID
   const generateId = () => {
@@ -308,13 +300,11 @@ export default function GradeCalculator() {
     return grade.toFixed(settings.showDecimalPlaces)
   }
 
-  // Special function for formatting final grades that applies rounding
-  const formatFinalGrade = (grade: number): string => {
-    if (settings.roundToWhole) {
-      return Math.round(grade).toString()
-    }
-    return grade.toFixed(settings.showDecimalPlaces)
-  }
+  const formatFinalGrade = (grade: number): string =>
+    applyFinalGradeRounding(grade, settings).toFixed(settings.roundToWhole ? 0 : settings.showDecimalPlaces)
+
+  const formatExamRequirement = (score: number): string =>
+    formatRequiredScore(score, settings.showDecimalPlaces)
 
   const formatLastSync = (timestamp: string | null): string => {
     if (!timestamp) return "Never"
@@ -372,7 +362,7 @@ export default function GradeCalculator() {
     if (!Number.isFinite(required)) return "No final"
     if (required > 100) return "Impossible"
     if (required <= 0) return "Already achieved"
-    return `${formatGrade(required)}%`
+    return `${formatExamRequirement(required)}%`
   }
 
   // Helper function to get achievable class
@@ -387,7 +377,7 @@ export default function GradeCalculator() {
   const getAchievableText = (achievable: any): string => {
     if (!achievable) return "—"
     if (achievable.required <= 0) return "✓"
-    return `${formatGrade(achievable.required)}%`
+    return `${formatExamRequirement(achievable.required)}%`
   }
 
   const parseGrade = (value: string): number => {
@@ -452,7 +442,7 @@ export default function GradeCalculator() {
   const handleAddAssignment = (classId: string) => {
     const newAssignment: Assignment = {
       id: generateId(),
-      name: "Assignment " + (getClassById(classId)?.assignments.length + 1 || 1),
+      name: "Assignment " + ((getClassById(classId)?.assignments.length ?? 0) + 1),
       score: 85,
       totalPoints: 100,
       weight: 10,
@@ -525,18 +515,13 @@ export default function GradeCalculator() {
     const required = calcRequiredRaw(cls.current, cls.weight, targetBand.cutoff)
     return {
       ...targetBand,
-      required: Number.isFinite(required) ? Math.ceil(Math.max(0, required) * 100) / 100 : required,
+      required: Math.max(0, required),
     }
   }
 
-  const getCurrentGradeBand = (grade: number) => {
-    for (const band of gradeBands) {
-      if (grade >= band.cutoff) {
-        return band
-      }
-    }
-    return gradeBands[gradeBands.length - 1] // F
-  }
+  const getCurrentGradeBand = (grade: number) => getGradeBand(grade, gradeBands)!
+  const getProjectedGradeBand = (grade: number) =>
+    getCurrentGradeBand(applyFinalGradeRounding(grade, settings))
 
   const getSuggestedTarget = (grade: number) => {
     return getCurrentGradeBand(grade).label
@@ -559,45 +544,28 @@ export default function GradeCalculator() {
     })
   }
 
-  const importData = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const importData = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
+    event.target.value = ""
     if (!file) return
 
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      try {
-        const importedData = JSON.parse(e.target?.result as string)
-        if (importedData.classes && Array.isArray(importedData.classes)) {
-          setClasses(importedData.classes)
-          if (importedData.settings) {
-            setSettings(importedData.settings)
-          }
-          toast({
-            title: "Data imported",
-            description: "Your grade data has been imported successfully.",
-          })
-        } else if (Array.isArray(importedData)) {
-          // Support for older export format
-          setClasses(importedData)
-          toast({
-            title: "Data imported",
-            description: "Your grade data has been imported successfully.",
-          })
-        } else {
-          throw new Error("Invalid data format")
-        }
-      } catch (error) {
-        toast({
-          title: "Import failed",
-          description: "The file contains invalid data.",
-          variant: "destructive",
-        })
-      }
+    try {
+      if (file.size > 5_000_000) throw new Error("Choose a calculator backup smaller than 5 MB.")
+      const data = parseGradeBackup(JSON.parse(await file.text()))
+      if (!data) throw new Error("Choose a valid FinalsCalc JSON backup.")
+      const count = data.classes.length
+      if (!window.confirm(`Replace your current classes with ${count} from this backup${data.settings ? " and apply its settings" : ""}?`)) return
+      setClasses(data.classes)
+      if (data.settings) setSettings(data.settings)
+      toast({ title: "Backup imported", description: `Restored ${count} classes.` })
+    } catch (error) {
+      toast({
+        title: "Import failed",
+        description: error instanceof SyntaxError ? "Choose a valid FinalsCalc JSON backup." :
+          error instanceof Error ? error.message : "Your existing classes were not changed.",
+        variant: "destructive",
+      })
     }
-    reader.readAsText(file)
-
-    // Reset the input value so the same file can be imported again if needed
-    event.target.value = ""
   }
 
   const resetData = () => {
@@ -661,7 +629,7 @@ export default function GradeCalculator() {
     setCanvasSyncMessage(null)
 
     try {
-      const { courses } = await fetchCanvasCoursesProxy(normalizedBase, token)
+      const { courses } = await importCanvasCourses(normalizedBase, token)
 
       const mappedCourses = courses
         .map((course) => {
@@ -708,13 +676,12 @@ export default function GradeCalculator() {
         const existingCanvas = prev.filter((cls) => cls.source === "canvas")
 
         const mergedCanvas = mappedCourses.map((incoming) => {
-          const existing = existingCanvas.find((cls) => cls.canvasCourseId === incoming.canvasCourseId)
+          const existing = existingCanvas.find((cls) => cls.canvasCourseUrl === incoming.canvasCourseUrl)
           if (existing) {
             return {
               ...existing,
-              ...incoming,
-              assignments: existing.assignments ?? [],
-              id: existing.id,
+              current: incoming.current,
+              lastSyncedAt: incoming.lastSyncedAt,
             }
           }
           return incoming
@@ -732,75 +699,9 @@ export default function GradeCalculator() {
         description: `Imported ${mappedCourses.length} course${mappedCourses.length === 1 ? "" : "s"} from Canvas.`,
       })
     } catch (error) {
-      // If proxy fails (e.g., not available in local dev), fall back to direct fetch and surface CORS guidance.
-      const fallbackMsg =
-        "Proxy not available. If you see a CORS error, build and run with Cloudflare Pages Functions (wrangler) or set NEXT_PUBLIC_CANVAS_PROXY_URL."
-      setCanvasSyncMessage(fallbackMsg)
-      toast({ title: "Canvas sync fallback", description: fallbackMsg })
-      try {
-        const { courses } = await fetchCanvasCourses(normalizedBase, token)
-        // Re-run mapping if direct fetch works (e.g., same-origin or permissive CORS)
-        const mappedCourses = courses
-          .map((course) => {
-            const enrollment = pickStudentEnrollment(course.enrollments)
-            const score =
-              enrollment?.computed_current_score ??
-              enrollment?.grades?.current_score ??
-              enrollment?.computed_final_score ??
-              enrollment?.grades?.final_score
-            if (score === undefined || score === null || Number.isNaN(Number(score))) return null
-            const currentScore = Math.max(0, Math.min(100, Number(score)))
-            const color = colorOptions[Math.abs(course.id) % colorOptions.length]?.value ?? "bg-blue-500"
-            const target = getSuggestedTarget(currentScore)
-            return {
-              id: generateId(),
-              name: course.name || course.course_code || `Course ${course.id}`,
-              current: currentScore,
-              weight: canvasDefaultWeight,
-              target,
-              assignments: [],
-              color,
-              credits: 3,
-              source: "canvas",
-              canvasCourseId: course.id,
-              canvasCourseUrl: `${normalizedBase}/courses/${course.id}`,
-              lastSyncedAt: new Date().toISOString(),
-            } as GradeClass
-          })
-          .filter(Boolean) as GradeClass[]
-
-        if (mappedCourses.length === 0) {
-          setCanvasSyncMessage(
-            "No courses with grades were returned. Check token scopes or use the proxy for accurate results.",
-          )
-          setCanvasImportedCount(0)
-          return
-        }
-
-        setClasses((prev) => {
-          const manualClasses = prev.filter((cls) => cls.source !== "canvas")
-          const existingCanvas = prev.filter((cls) => cls.source === "canvas")
-          const mergedCanvas = mappedCourses.map((incoming) => {
-            const existing = existingCanvas.find((cls) => cls.canvasCourseId === incoming.canvasCourseId)
-            if (existing) return { ...existing, ...incoming, assignments: existing.assignments ?? [], id: existing.id }
-            return incoming
-          })
-          return [...manualClasses, ...mergedCanvas]
-        })
-
-        setCanvasImportedCount(mappedCourses.length)
-        const now = new Date().toISOString()
-        setLastCanvasSync(now)
-        setCanvasSyncMessage(`Last sync imported ${mappedCourses.length} course${mappedCourses.length === 1 ? "" : "s"}.`)
-        toast({
-          title: "Canvas synced",
-          description: `Imported ${mappedCourses.length} course${mappedCourses.length === 1 ? "" : "s"} from Canvas.`,
-        })
-      } catch (innerErr) {
-        const message = innerErr instanceof Error ? innerErr.message : "Failed to sync with Canvas."
-        setCanvasSyncMessage(message)
-        toast({ title: "Canvas sync failed", description: message, variant: "destructive" })
-      }
+      const message = error instanceof Error ? error.message : "Failed to sync with Canvas."
+      setCanvasSyncMessage(message)
+      toast({ title: "Canvas sync failed", description: message, variant: "destructive" })
     } finally {
       setIsCanvasSyncing(false)
     }
@@ -883,11 +784,8 @@ export default function GradeCalculator() {
 
     if (!targetBand) return "unknown"
 
-    if (cls.current >= targetBand.cutoff) {
-      return "achieved"
-    }
-
     const required = calcRequiredRaw(cls.current, cls.weight, targetBand.cutoff)
+    if (required <= 0) return "achieved"
     if (required > 100) {
       return "impossible"
     }
@@ -914,7 +812,7 @@ export default function GradeCalculator() {
     }
   }
 
-  const getTargetRequirementText = (cls: GradeClass | null) => {
+  const getTargetRequirementText = (cls: GradeClass | undefined) => {
     if (!cls) return "No class selected"
     const targetGrade = getTargetGrade(cls)
     if (!targetGrade) return "No target set"
@@ -930,7 +828,7 @@ export default function GradeCalculator() {
     if (targetGrade.required <= 0) {
       return "Already achieved"
     }
-    return `Needs ${formatGrade(targetGrade.required)}% on final`
+    return `Needs ${formatExamRequirement(targetGrade.required)}% on final`
   }
 
   const renderInsightsContent = () => {
@@ -1056,6 +954,8 @@ export default function GradeCalculator() {
                     currentGrade={getClassById(selectedClassId)?.current ?? 0}
                     finalWeight={getClassById(selectedClassId)?.weight ?? 0}
                     gradeBands={gradeBands}
+                    roundToWhole={settings.roundToWhole}
+                    decimalPlaces={settings.showDecimalPlaces}
                   />
                 </div>
               </CardContent>
@@ -1092,7 +992,7 @@ export default function GradeCalculator() {
                   if (!cls) return null
 
                   const finalGrade = calculateFinalGrade(cls.current, cls.weight, finalScore)
-                  const letterGrade = getCurrentGradeBand(finalGrade)
+                  const letterGrade = getProjectedGradeBand(finalGrade)
 
                   return (
                     <Card
@@ -1211,27 +1111,27 @@ export default function GradeCalculator() {
         <Tabs defaultValue="calculator" value={activeTab} onValueChange={setActiveTab} className="w-full">
         <div className="flex justify-between items-center mb-4">
           <TabsList className="grid grid-cols-6 w-auto">
-            <TabsTrigger value="calculator" className="flex items-center gap-1">
+            <TabsTrigger value="calculator" aria-label="Calculator" className="flex items-center gap-1">
               <Calculator className="w-4 h-4" />
               <span className="hidden sm:inline">Calculator</span>
             </TabsTrigger>
-            <TabsTrigger value="insights" className="flex items-center gap-1">
+            <TabsTrigger value="insights" aria-label="Insights" className="flex items-center gap-1">
               <BarChart4 className="w-4 h-4" />
               <span className="hidden sm:inline">Insights</span>
             </TabsTrigger>
-            <TabsTrigger value="tables" className="flex items-center gap-1">
+            <TabsTrigger value="tables" aria-label="Tables" className="flex items-center gap-1">
               <Table className="w-4 h-4" />
               <span className="hidden sm:inline">Tables</span>
             </TabsTrigger>
-            <TabsTrigger value="what-if" className="flex items-center gap-1">
+            <TabsTrigger value="what-if" aria-label="What-If" className="flex items-center gap-1">
               <Dices className="w-4 h-4" />
               <span className="hidden sm:inline">What-If</span>
             </TabsTrigger>
-            <TabsTrigger value="statistics" className="flex items-center gap-1">
+            <TabsTrigger value="statistics" aria-label="Statistics" className="flex items-center gap-1">
               <BarChart4 className="w-4 h-4" />
               <span className="hidden sm:inline">Statistics</span>
             </TabsTrigger>
-            <TabsTrigger value="settings" className="flex items-center gap-1">
+            <TabsTrigger value="settings" aria-label="Settings" className="flex items-center gap-1">
               <Settings className="w-4 h-4" />
               <span className="hidden sm:inline">Settings</span>
             </TabsTrigger>
@@ -1239,6 +1139,7 @@ export default function GradeCalculator() {
 
           <div className="flex gap-2">
             <ExportDialog
+              containerRef={reportRef}
               data={{ classes, settings }}
               trigger={
                 <Button variant="outline" size="sm" className="hidden sm:flex">
@@ -1523,7 +1424,7 @@ export default function GradeCalculator() {
                                     className="flex justify-between items-center"
                                   >
                                     <span>{band.label}:</span>
-                                    <span>{formatGrade(band.raw)}%</span>
+                                    <span>{formatExamRequirement(band.raw)}%</span>
                                   </Badge>
                                 ))}
                             </div>
@@ -1811,7 +1712,7 @@ export default function GradeCalculator() {
                               </td>
                               {[100, 90, 80, 70, 60, 0].map((score) => {
                                 const finalGrade = calculateFinalGrade(cls.current, cls.weight, score)
-                                const letterGrade = getCurrentGradeBand(finalGrade)
+                                const letterGrade = getProjectedGradeBand(finalGrade)
                                 return (
                                   <td key={score} className="px-4 py-3 text-center">
                                     <div className="flex flex-col items-center">
@@ -1863,7 +1764,10 @@ export default function GradeCalculator() {
           <EnhancedWhatIf
             classes={classes}
             gradeBands={gradeBands}
+            roundToWhole={settings.roundToWhole}
             formatGrade={formatGrade}
+            formatFinalGrade={formatFinalGrade}
+            formatExamRequirement={formatExamRequirement}
           />
         </TabsContent>
 
@@ -1965,13 +1869,14 @@ export default function GradeCalculator() {
                     </p>
                   </div>
                   <Select
-                    id="grading-system"
                     value={settings.gradingSystem ?? "letter"}
-                    onValueChange={(value: "letter" | "percentage" | "gpa") =>
-                      updateSettings({ gradingSystem: value })
-                    }
+                    onValueChange={(value) => {
+                      if (value === "letter" || value === "percentage" || value === "gpa") {
+                        updateSettings({ gradingSystem: value })
+                      }
+                    }}
                   >
-                    <SelectTrigger className="w-[180px]">
+                    <SelectTrigger id="grading-system" className="w-[180px]">
                       <SelectValue placeholder="Select grading system" />
                     </SelectTrigger>
                     <SelectContent>
@@ -2054,10 +1959,12 @@ export default function GradeCalculator() {
             <CardContent className="space-y-4">
               <Alert>
                 <ShieldCheck className="h-4 w-4" />
-                <AlertTitle>Token stays on this device</AlertTitle>
+                <AlertTitle>How Canvas sync uses your token</AlertTitle>
                 <AlertDescription>
-                  Your Canvas token is only used in your browser to call Canvas directly. Turn on "Remember token"
-                  if you want it stored in local storage.
+                  When you sync, your Canvas domain and access token are sent to the import proxy, which forwards your
+                  token to your school&apos;s Canvas and returns course names and grades. If the proxy can&apos;t connect, your
+                  browser may try Canvas directly. &quot;Remember token&quot; saves a copy in this browser. You can enter grades
+                  manually without sharing a Canvas token.
                 </AlertDescription>
               </Alert>
 
@@ -2104,8 +2011,12 @@ export default function GradeCalculator() {
                     <Input
                       id="canvas-token"
                       type="password"
-                      value={canvasToken}
-                      onChange={(e) => setCanvasToken(e.target.value)}
+                      value={canvasTokenToUse}
+                      onChange={(e) => {
+                        const value = e.target.value
+                        setCanvasToken(value)
+                        if (rememberCanvasToken) setPersistedCanvasToken(value)
+                      }}
                       placeholder="Paste your Canvas token"
                     />
                   </div>
@@ -2114,7 +2025,11 @@ export default function GradeCalculator() {
                       <Switch
                         id="remember-canvas-token"
                         checked={rememberCanvasToken}
-                        onCheckedChange={setRememberCanvasToken}
+                        onCheckedChange={(remember) => {
+                          setCanvasToken(canvasTokenToUse)
+                          setRememberCanvasToken(remember)
+                          setPersistedCanvasToken(remember ? canvasTokenToUse : "")
+                        }}
                       />
                       <Label htmlFor="remember-canvas-token" className="cursor-pointer">
                         Remember token on this device
@@ -2203,6 +2118,7 @@ export default function GradeCalculator() {
             <CardContent className="space-y-4">
               <div className="flex flex-col sm:flex-row gap-4">
                 <ExportDialog
+              containerRef={reportRef}
                   data={{ classes, settings }}
                   trigger={
                     <Button className="flex items-center">

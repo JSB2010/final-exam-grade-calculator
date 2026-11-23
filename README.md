@@ -33,7 +33,13 @@ FinalsCalc is a powerful and intuitive web application that helps students calcu
 - **Responsive Design**: Works seamlessly on desktop, tablet, and mobile devices with touch optimizations
 - **PWA Support**: Install as a native app with offline functionality
 - **Dark Mode Support**: Toggle between light and dark themes with system preference detection
-- **Local Storage**: Your data is saved locally in your browser for privacy and convenience
+- **Local Storage**: Calculator settings and grades are saved in your browser. Canvas Sync sends the Canvas domain and token through the import proxy when used.
+
+## Canvas import privacy and setup
+
+Canvas Sync sends the Canvas URL and token to the Cloudflare Pages function at `/api/canvas/courses` unless a trusted HTTPS proxy is configured with `NEXT_PUBLIC_CANVAS_PROXY_URL`. The proxy sends the token to the selected Canvas origin and returns only the course and enrollment fields needed to import grades. It does not implement token or grade storage. Direct browser requests are a fallback where a school's Canvas allows cross-origin access and the deployment's Content Security Policy permits the host. Remembering a token is optional and saves it in that browser; manual grade entry needs no token.
+
+The built-in proxy accepts standard Canvas school domains under `instructure.com`. For an institution's custom domain, an operator can add the trusted hostname to the Cloudflare Pages `CANVAS_ALLOWED_HOSTS` environment variable (comma-separated; names match exactly, and a `*.` prefix allows subdomains if needed). Only add institution-controlled Canvas hosts, not general-purpose hosting domains. No deployment configuration has to change for hosted `*.instructure.com` sites. If deploying with a custom, cross-origin proxy or enabling browser fallback to a custom Canvas domain, also add its trusted HTTPS origin to `connect-src` in `public/_headers`.
 
 ## 🚀 Technologies Used
 
@@ -176,3 +182,10 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [Recharts](https://recharts.org/) for the charting library
 - [Framer Motion](https://www.framer.com/motion/) for the animations
 - [Lucide React](https://lucide.dev/) for the icons
+
+
+## Verify changes
+
+Run `npm test` for grade calculations, mocked Canvas imports, and share and backup validation. Use `npm run typecheck` and `npm run build` before publishing. The static build goes to `out/`; Cloudflare Pages serves the exported routes directly, with only the Canvas API routed through Pages Functions.
+
+Share links contain a readable snapshot of course names and calculation inputs, not assignment details or Canvas identifiers. Keep them private if you don't want others to see your grades. Shared classes are added as copies. Use a JSON backup instead when you want to preserve assignment detail.

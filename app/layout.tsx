@@ -1,11 +1,8 @@
 import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
-import Script from 'next/script'
 import './globals.css'
 import { ThemeProvider } from '@/components/theme-provider'
 import { Toaster } from '@/components/ui/toaster'
 
-const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://finalscalc.com'),
@@ -49,7 +46,7 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
         <link rel="icon" type="image/png" href="/icon-192x192.png" />
       </head>
-      <body className={inter.className}>
+      <body className="font-sans">
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
@@ -59,7 +56,6 @@ export default function RootLayout({
           {children}
           <Toaster />
         </ThemeProvider>
-        <Script src="https://jacobbarkin.com/embed/credit.js" strategy="afterInteractive" />
         <script
           dangerouslySetInnerHTML={{
             __html: `

@@ -1,22 +1,31 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { AlertTriangle, CheckCircle2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { useToast } from "@/hooks/use-toast"
-import { decodeShareData } from "@/utils/share-data"
-import { serializeAppSettings, serializeGradeClasses } from "@/utils/storage-schemas"
+import { decodeShareData, readShareDataFromLocation } from "@/utils/share-data"
+import { parseGradeClasses, serializeAppSettings, serializeGradeClasses } from "@/utils/storage-schemas"
 
-type SharedImportProps = {
-  encodedData?: string
-}
-
-export function SharedImport({ encodedData }: SharedImportProps) {
+export function SharedImport() {
   const { toast } = useToast()
   const [imported, setImported] = useState(false)
+  const [encodedData, setEncodedData] = useState<string | null>()
+  const [applySettings, setApplySettings] = useState(false)
+
+  useEffect(() => {
+    const read = () => {
+      setEncodedData(readShareDataFromLocation(window.location))
+      setImported(false)
+      setApplySettings(false)
+    }
+    read()
+    window.addEventListener("hashchange", read)
+    return () => window.removeEventListener("hashchange", read)
+  }, [])
 
   const payload = useMemo(() => {
     if (!encodedData) return null
@@ -24,11 +33,31 @@ export function SharedImport({ encodedData }: SharedImportProps) {
   }, [encodedData])
 
   const handleImport = () => {
-    if (!payload) return
+    if (!payload || imported) return
     try {
-      localStorage.setItem("grade-calculator-classes", serializeGradeClasses(payload.classes))
-      if (payload.settings) {
-        localStorage.setItem("grade-calculator-settings", serializeAppSettings(payload.settings))
+      const key = "grade-calculator-classes"
+      const previous = localStorage.getItem(key)
+      const existing = previous === null ? [] : parseGradeClasses(JSON.parse(previous), [])
+      if (previous !== null && !existing.length) {
+        // An empty list is valid, but don't overwrite an unrecognized saved format.
+        const raw = JSON.parse(previous)
+        if (!Array.isArray(raw) && !(raw?.version === 1 && Array.isArray(raw.data))) {
+          throw new Error("Unrecognized local grade data")
+        }
+        if ((Array.isArray(raw) ? raw : raw.data).length) throw new Error("Invalid local grade data")
+      }
+      const added = payload.classes.map(({ source, canvasCourseId, canvasCourseUrl, lastSyncedAt, ...cls }) => ({
+        ...cls, id: crypto.randomUUID(),
+      }))
+      localStorage.setItem(key, serializeGradeClasses([...existing, ...added]))
+      if (payload.settings && applySettings) {
+        try {
+          localStorage.setItem("grade-calculator-settings", serializeAppSettings(payload.settings))
+        } catch {
+          setImported(true)
+          toast({ title: "Classes imported", description: "Browser storage couldn't save the shared settings." })
+          return
+        }
       }
       toast({
         title: "Data imported",
@@ -39,10 +68,14 @@ export function SharedImport({ encodedData }: SharedImportProps) {
       console.error("Failed to import shared data:", error)
       toast({
         title: "Import failed",
-        description: "We couldn't import this share link. Please ask for a new link.",
+        description: "Your classes weren’t changed. Check that browser storage is available and try again.",
         variant: "destructive",
       })
     }
+  }
+
+  if (encodedData === undefined) {
+    return <p className="container mx-auto px-4 py-12" role="status">Loading shared grades…</p>
   }
 
   if (!encodedData) {
@@ -85,7 +118,7 @@ export function SharedImport({ encodedData }: SharedImportProps) {
         <CardHeader>
           <CardTitle>Import Shared Grades</CardTitle>
           <CardDescription>
-            This link contains grade data embedded in the URL. Importing will replace your current classes.
+            This link contains grade data. Importing adds copies without replacing saved classes.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -98,6 +131,12 @@ export function SharedImport({ encodedData }: SharedImportProps) {
               {payload.settings ? "Settings are included in this share link." : "Settings are not included."}
             </div>
           </div>
+          {payload.settings && (
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={applySettings} disabled={imported} onChange={(event) => setApplySettings(event.target.checked)} />
+              Also apply the shared calculator settings
+            </label>
+          )}
           <div className="space-y-2">
             {payload.classes.slice(0, 6).map((cls) => (
               <div key={cls.id} className="flex items-center justify-between text-sm">
@@ -114,7 +153,7 @@ export function SharedImport({ encodedData }: SharedImportProps) {
         </CardContent>
         <CardFooter className="flex flex-wrap gap-3">
           <Button onClick={handleImport} disabled={imported}>
-            {imported ? "Imported" : "Import into calculator"}
+            {imported ? "Imported" : "Add to calculator"}
           </Button>
           <Button variant="outline" asChild>
             <Link href="/calculator">{imported ? "Open calculator" : "Skip to calculator"}</Link>

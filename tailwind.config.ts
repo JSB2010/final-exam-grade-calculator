@@ -1,4 +1,5 @@
 import type { Config } from "tailwindcss";
+import plugin from "tailwindcss/plugin";
 
 const config: Config = {
     darkMode: ["class"],
@@ -93,7 +94,7 @@ const config: Config = {
   },
   plugins: [
     require("tailwindcss-animate"),
-    function({ addUtilities, matchUtilities, theme }) {
+    plugin(({ addUtilities }) => {
       addUtilities({
         '.bg-grid-slate-200-50': {
           'background-image': 'linear-gradient(to right, rgba(226, 232, 240, 0.5) 1px, transparent 1px), linear-gradient(to bottom, rgba(226, 232, 240, 0.5) 1px, transparent 1px)'
@@ -102,7 +103,7 @@ const config: Config = {
           'background-image': 'linear-gradient(to right, rgba(30, 41, 59, 0.2) 1px, transparent 1px), linear-gradient(to bottom, rgba(30, 41, 59, 0.2) 1px, transparent 1px)'
         },
       });
-    },
+    }),
   ],
 };
 export default config;

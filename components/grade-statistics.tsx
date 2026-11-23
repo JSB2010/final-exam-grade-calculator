@@ -13,6 +13,7 @@ interface GradeClass {
   current: number
   weight: number
   target: string
+  color: string
   credits?: number
 }
 

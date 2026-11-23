@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import { Label } from "@/components/ui/label"
-import { calculateFinalGrade, normalizeWeight } from "@/utils/grade-math"
+import { applyFinalGradeRounding, calculateFinalGrade, getFinalGradeThreshold, normalizeWeight } from "@/utils/grade-math"
 
 type GradeBand = {
   label: string
@@ -14,9 +14,11 @@ type GradeChartProps = {
   currentGrade: number
   finalWeight: number
   gradeBands: GradeBand[]
+  roundToWhole: boolean
+  decimalPlaces: number
 }
 
-export default function GradeChart({ currentGrade, finalWeight, gradeBands }: Readonly<GradeChartProps>) {
+export default function GradeChart({ currentGrade, finalWeight, gradeBands, roundToWhole, decimalPlaces }: Readonly<GradeChartProps>) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [mounted, setMounted] = useState(false)
 
@@ -108,15 +110,18 @@ export default function GradeChart({ currentGrade, finalWeight, gradeBands }: Re
       ctx.fillText("Final Grade (%)", 0, 0)
       ctx.restore()
 
-      // Draw grade bands
+      // Draw the thresholds (raw percentages needed under the selected rounding policy).
+      const roundOptions = { roundToWhole }
       const sortedBands = [...gradeBands].sort((a, b) => a.cutoff - b.cutoff)
 
-      for (let i = 0; i < sortedBands.length - 1; i++) {
+      for (let i = 0; i < sortedBands.length; i++) {
         const band = sortedBands[i]
         const nextBand = sortedBands[i + 1]
 
-        const y1 = padding.top + chartHeight - (band.cutoff / 100) * chartHeight
-        const y2 = padding.top + chartHeight - (nextBand.cutoff / 100) * chartHeight
+        const lower = Math.max(0, getFinalGradeThreshold(band.cutoff, roundOptions))
+        const upper = nextBand ? getFinalGradeThreshold(nextBand.cutoff, roundOptions) : 100
+        const y1 = padding.top + chartHeight - (lower / 100) * chartHeight
+        const y2 = padding.top + chartHeight - (upper / 100) * chartHeight
 
         // Extract color from Tailwind class
         let color = ""
@@ -197,7 +202,8 @@ export default function GradeChart({ currentGrade, finalWeight, gradeBands }: Re
         ctx.textAlign = "center"
         ctx.textBaseline = "top"
         ctx.font = "10px system-ui, sans-serif"
-        ctx.fillText(`${Math.round(finalGrade)}%`, targetX, targetY + 10)
+        const reportedGrade = applyFinalGradeRounding(finalGrade, roundOptions)
+        ctx.fillText(`${reportedGrade.toFixed(roundToWhole ? 0 : decimalPlaces)}%`, targetX, targetY + 10)
       })
     }
 
@@ -222,7 +228,7 @@ export default function GradeChart({ currentGrade, finalWeight, gradeBands }: Re
       resizeObserver.disconnect()
       window.removeEventListener("resize", handleResize)
     }
-  }, [currentGrade, finalWeight, gradeBands, mounted])
+  }, [currentGrade, finalWeight, gradeBands, roundToWhole, decimalPlaces, mounted])
 
   // Show a placeholder during SSR and hydration
   if (!mounted) {

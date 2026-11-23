@@ -28,7 +28,7 @@ interface ExportDialogProps {
     tableData?: GradeTableData[]
     settings?: any
   }
-  containerRef?: React.RefObject<HTMLElement>
+  containerRef?: React.RefObject<HTMLElement | null>
   trigger?: React.ReactNode
 }
 
@@ -38,7 +38,6 @@ export function ExportDialog({ data, containerRef, trigger }: ExportDialogProps)
   const [format, setFormat] = useState<ExportFormat>("json")
   const [filename, setFilename] = useState("grade-calculator-export")
   const [includeSettings, setIncludeSettings] = useState(true)
-  const [includeCharts, setIncludeCharts] = useState(true)
   const [isExporting, setIsExporting] = useState(false)
 
   const handleExport = async () => {
@@ -54,7 +53,6 @@ export function ExportDialog({ data, containerRef, trigger }: ExportDialogProps)
         filename,
         format,
         title: "Grade Calculator Export",
-        includeCharts,
       }
 
       switch (format) {
@@ -70,7 +68,7 @@ export function ExportDialog({ data, containerRef, trigger }: ExportDialogProps)
             target: cls.target,
             credits: cls.credits || 0,
           }))
-          exportToCsv(flattenedData, `${filename}.csv`)
+          exportToCsv(flattenedData, `${filename}.csv`, ["name", "current", "weight", "target", "credits"])
           break
         case "pdf":
           if (containerRef?.current) {
@@ -119,7 +117,7 @@ export function ExportDialog({ data, containerRef, trigger }: ExportDialogProps)
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Export Data</DialogTitle>
-          <DialogDescription>Choose a format and options for exporting your grade calculator data.</DialogDescription>
+          <DialogDescription>Use JSON to back up or restore your data. PDF and PNG capture the current calculator view.</DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <div className="space-y-2">
@@ -150,20 +148,20 @@ export function ExportDialog({ data, containerRef, trigger }: ExportDialogProps)
                 </Label>
               </div>
               <div className="flex items-center space-x-2">
-                <RadioGroupItem value="pdf" id="format-pdf" disabled={!containerRef?.current} />
+                <RadioGroupItem value="pdf" id="format-pdf" disabled={!containerRef} />
                 <Label
                   htmlFor="format-pdf"
-                  className={`flex items-center gap-2 cursor-pointer ${!containerRef?.current ? "opacity-50" : ""}`}
+                  className={`flex items-center gap-2 cursor-pointer ${!containerRef ? "opacity-50" : ""}`}
                 >
                   <FileText className="h-4 w-4" />
                   PDF (Document)
                 </Label>
               </div>
               <div className="flex items-center space-x-2">
-                <RadioGroupItem value="png" id="format-png" disabled={!containerRef?.current} />
+                <RadioGroupItem value="png" id="format-png" disabled={!containerRef} />
                 <Label
                   htmlFor="format-png"
-                  className={`flex items-center gap-2 cursor-pointer ${!containerRef?.current ? "opacity-50" : ""}`}
+                  className={`flex items-center gap-2 cursor-pointer ${!containerRef ? "opacity-50" : ""}`}
                 >
                   <ImageIcon className="h-4 w-4" />
                   PNG (Image)
@@ -172,39 +170,12 @@ export function ExportDialog({ data, containerRef, trigger }: ExportDialogProps)
             </RadioGroup>
           </div>
 
-          <div className="space-y-2">
-            <Label>Options</Label>
-            <div className="space-y-2">
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="include-settings"
-                  checked={includeSettings}
-                  onCheckedChange={(checked) => setIncludeSettings(checked as boolean)}
-                  disabled={format === "csv" || format === "png"}
-                />
-                <Label
-                  htmlFor="include-settings"
-                  className={`cursor-pointer ${format === "csv" || format === "png" ? "opacity-50" : ""}`}
-                >
-                  Include settings
-                </Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="include-charts"
-                  checked={includeCharts}
-                  onCheckedChange={(checked) => setIncludeCharts(checked as boolean)}
-                  disabled={format !== "pdf" && format !== "png"}
-                />
-                <Label
-                  htmlFor="include-charts"
-                  className={`cursor-pointer ${format !== "pdf" && format !== "png" ? "opacity-50" : ""}`}
-                >
-                  Include charts and visualizations
-                </Label>
-              </div>
+          {format === "json" && (
+            <div className="flex items-center space-x-2">
+              <Checkbox id="include-settings" checked={includeSettings} onCheckedChange={(checked) => setIncludeSettings(checked === true)} />
+              <Label htmlFor="include-settings" className="cursor-pointer">Include settings</Label>
             </div>
-          </div>
+          )}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>

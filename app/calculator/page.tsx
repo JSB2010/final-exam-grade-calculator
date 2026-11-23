@@ -282,12 +282,12 @@ export default function CalculatorPage() {
 
               <div className="glass-card rounded-xl p-6">
                 <h3 className="font-semibold text-lg mb-2">Does FinalsCalc work with Canvas, Blackboard, or other LMS platforms?</h3>
-                <p className="text-muted-foreground">FinalsCalc has a Canvas LMS integration that can import your current grades directly, so you don&apos;t have to manually enter them. For other platforms (Blackboard, Moodle, D2L), you can manually copy your current grade percentage from the gradebook into the calculator.</p>
+                <p className="text-muted-foreground">FinalsCalc has a Canvas LMS integration that can import your current grades, so you don&apos;t have to manually enter them. For other platforms (Blackboard, Moodle, D2L), you can manually copy your current grade percentage from the gradebook into the calculator.</p>
               </div>
 
               <div className="glass-card rounded-xl p-6">
                 <h3 className="font-semibold text-lg mb-2">Is my grade data saved or shared?</h3>
-                <p className="text-muted-foreground">All your data is stored locally in your browser using localStorage — nothing is sent to any server. Your grade information is completely private and only accessible on your device. You can also use the share feature to generate an encoded link if you want to share your setup with someone else.</p>
+                <p className="text-muted-foreground">Manual grade calculations run in your browser, where your calculator settings and grades are saved. If you use Canvas Sync, the import proxy receives your Canvas domain and token to retrieve course names and grades from Canvas. Share links contain your calculator setup, so only send them to people you want to see it.</p>
               </div>
 
               <div className="glass-card rounded-xl p-6">

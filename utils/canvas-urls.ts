@@ -1,65 +1,36 @@
+const CANVAS_COURSES_PATH = "/api/v1/courses"
 const CANVAS_COURSES_QUERY = "enrollment_state=active&include[]=total_scores&include[]=enrollments&per_page=50"
 
-const isIpv4 = (hostname: string): boolean => {
-  const parts = hostname.split(".")
-  if (parts.length !== 4) return false
-  return parts.every((part) => {
-    if (!/^\d+$/.test(part)) return false
-    const value = Number(part)
-    return value >= 0 && value <= 255
-  })
-}
-
-const isPrivateIpv4 = (hostname: string): boolean => {
-  if (!isIpv4(hostname)) return false
-  const [a, b] = hostname.split(".").map(Number)
-  if (a === 10) return true
-  if (a === 127) return true
-  if (a === 169 && b === 254) return true
-  if (a === 192 && b === 168) return true
-  if (a === 172 && b >= 16 && b <= 31) return true
-  return false
-}
-
-const isPrivateIpv6 = (hostname: string): boolean => {
-  const normalized = hostname.toLowerCase()
-  if (normalized === "::1") return true
-  if (normalized.startsWith("fe80:")) return true
-  if (normalized.startsWith("fc") || normalized.startsWith("fd")) return true
-  return false
-}
-
-const isPrivateHostname = (hostname: string): boolean => {
-  const normalized = hostname.toLowerCase()
-  if (normalized === "localhost" || normalized.endsWith(".localhost")) return true
-  if (normalized === "0.0.0.0") return true
-  if (isPrivateIpv4(normalized) || isPrivateIpv6(normalized)) return true
-  return false
-}
-
-const normalizeAllowHosts = (allowHosts?: string[]): string[] => {
-  if (!allowHosts) return []
-  return allowHosts.map((host) => host.toLowerCase().trim()).filter(Boolean)
-}
+const publicHostname = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z](?:[a-z0-9-]{0,61}[a-z0-9])?$/
 
 const isAllowedHost = (hostname: string, allowHosts: string[]): boolean => {
-  if (allowHosts.length === 0) return true
-  if (allowHosts.includes("*")) return true
-  return allowHosts.some((allowed) => hostname === allowed || hostname.endsWith(`.${allowed}`))
+  return allowHosts.some((entry) => {
+    const allowed = entry.trim().toLowerCase()
+    // Bare names match exactly; subdomains require an explicit wildcard.
+    return allowed.startsWith("*.")
+      ? hostname.endsWith(allowed.slice(1))
+      : hostname === allowed
+  })
 }
 
 export const parseLinkHeader = (header: string | null): string | null => {
   if (!header) return null
-  const parts = header.split(",")
-  for (const part of parts) {
-    const match = part.match(/<([^>]+)>;\s*rel="next"/)
-    if (match && match[1]) return match[1]
+  for (const match of header.matchAll(/<([^>]+)>([^<]*)/g)) {
+    if (/;\s*rel\s*=\s*(?:"next"|next)(?=\s*(?:[;,]|$))/i.test(match[2])) return match[1]
   }
   return null
 }
 
 export const buildCanvasCoursesUrl = (baseUrl: string): string => {
-  return `${baseUrl}/api/v1/courses?${CANVAS_COURSES_QUERY}`
+  return `${baseUrl}${CANVAS_COURSES_PATH}?${CANVAS_COURSES_QUERY}`
+}
+
+export const getCanvasCoursesPageUrl = (link: string, current: string, origin: string): string => {
+  const url = new URL(link, current)
+  if (url.origin !== origin || url.pathname !== CANVAS_COURSES_PATH || url.username || url.password || url.hash) {
+    throw new Error("Canvas returned an invalid course pagination URL.")
+  }
+  return url.href
 }
 
 export const validateCanvasBaseUrl = (
@@ -67,9 +38,7 @@ export const validateCanvasBaseUrl = (
   options?: { allowHosts?: string[] },
 ): { normalized: string; error?: string } => {
   const trimmed = raw.trim()
-  if (!trimmed) {
-    return { normalized: "", error: "Canvas base URL is required." }
-  }
+  if (!trimmed) return { normalized: "", error: "Canvas base URL is required." }
 
   const candidate = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`
   let url: URL
@@ -82,16 +51,13 @@ export const validateCanvasBaseUrl = (
   if (url.protocol !== "https:") {
     return { normalized: "", error: "Canvas base URL must start with https://." }
   }
-
-  if (isPrivateHostname(url.hostname)) {
-    return { normalized: "", error: "Canvas base URL must be a public domain." }
+  if (url.username || url.password || url.port || !publicHostname.test(url.hostname)
+      || /\.(localhost|local|internal)$/.test(url.hostname)) {
+    return { normalized: "", error: "Enter a public Canvas domain without credentials or a custom port." }
   }
-
-  const allowHosts = normalizeAllowHosts(options?.allowHosts)
-  if (!isAllowedHost(url.hostname.toLowerCase(), allowHosts)) {
-    return { normalized: "", error: "Canvas base URL is not in the allowed host list." }
+  if (options?.allowHosts && !isAllowedHost(url.hostname, options.allowHosts)) {
+    return { normalized: "", error: "This Canvas domain is not enabled for proxy import." }
   }
-
   return { normalized: url.origin }
 }
 
