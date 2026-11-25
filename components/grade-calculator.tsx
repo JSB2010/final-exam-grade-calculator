@@ -1845,81 +1845,9 @@ export default function GradeCalculator() {
                   />
                 </div>
 
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="grading-system">Grading System</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Choose how grades are displayed throughout the app
-                    </p>
-                  </div>
-                  <Select
-                    value={settings.gradingSystem ?? "letter"}
-                    onValueChange={(value) => {
-                      if (value === "letter" || value === "percentage" || value === "gpa") {
-                        updateSettings({ gradingSystem: value })
-                      }
-                    }}
-                  >
-                    <SelectTrigger id="grading-system" className="w-[180px]">
-                      <SelectValue placeholder="Select grading system" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="letter">Letter Grades (A, B, C)</SelectItem>
-                      <SelectItem value="percentage">Percentages (0-100%)</SelectItem>
-                      <SelectItem value="gpa">GPA Scale (0.0-4.0)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="shadow-md">
-            <CardHeader>
-              <h3 className="text-lg font-medium">Feature Settings</h3>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="flex flex-col gap-4">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="study-reminders">Study Reminders</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Enable notifications for upcoming study sessions
-                    </p>
-                  </div>
-                  <Switch
-                    id="study-reminders"
-                    checked={settings.studyReminderEnabled ?? false}
-                    onCheckedChange={(checked) => updateSettings({ studyReminderEnabled: checked })}
-                  />
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="auto-save">Auto-Save</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Automatically save changes as you make them
-                    </p>
-                  </div>
-                  <Switch
-                    id="auto-save"
-                    checked={settings.autoSaveEnabled ?? true}
-                    onCheckedChange={(checked) => updateSettings({ autoSaveEnabled: checked })}
-                  />
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="custom-grade-bands">Custom Grade Bands</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Define your own custom grade bands and cutoffs
-                    </p>
-                  </div>
-                  <Switch
-                    id="custom-grade-bands"
-                    checked={settings.customGradeBands ?? false}
-                    onCheckedChange={(checked) => updateSettings({ customGradeBands: checked })}
-                  />
+                <div className="space-y-2 rounded-lg border p-4 text-sm text-muted-foreground">
+                  <p>Letter grades use the built-in grade scale. Check your syllabus for your school&apos;s cutoffs.</p>
+                  <p>Classes and settings save automatically in this browser. Export a JSON backup to keep a separate copy.</p>
                 </div>
               </div>
             </CardContent>
