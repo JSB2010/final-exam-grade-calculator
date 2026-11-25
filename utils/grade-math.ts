@@ -55,6 +55,22 @@ export const getGradeBand = <Band extends { cutoff: number }>(
   bands: readonly Band[],
 ): Band | undefined => bands.find((band) => grade >= band.cutoff) ?? bands[bands.length - 1]
 
+export const getGradeDistribution = <Band extends { cutoff: number }>(
+  grades: readonly number[],
+  bands: readonly Band[],
+) => {
+  const counts = new Map<Band, number>()
+  for (const grade of grades) {
+    const band = getGradeBand(grade, bands)
+    if (band) counts.set(band, (counts.get(band) ?? 0) + 1)
+  }
+
+  return bands.flatMap((band) => {
+    const count = counts.get(band)
+    return count ? [{ ...band, count, percentage: (count / grades.length) * 100 }] : []
+  })
+}
+
 export const calculateRequiredScore = (
   current: number,
   weight: number,

@@ -6,6 +6,7 @@ import {
   calculateRequiredScore,
   formatRequiredScore,
   getGradeBand,
+  getGradeDistribution,
 } from "../utils/grade-math.ts"
 
 const rounded = { roundToWhole: true }
@@ -70,4 +71,23 @@ test("fractional weights preserve both sides of exact decimal grade thresholds",
   assert.equal(formatRequiredScore(calculateRequiredScore(57.9, 1, 58, rounded), 2), "17.90")
   assert.equal(formatRequiredScore(calculateRequiredScore(74.91, 79.76, 45), 2), "37.41")
   assert.equal(calculateFinalGrade(74.91, 79.76, 37.41), 45)
+})
+
+test("grade distribution counts each current grade once with descending cutoffs", () => {
+  const scale = [
+    { label: "A+", cutoff: 97 },
+    { label: "A", cutoff: 93 },
+    { label: "A−", cutoff: 90 },
+    { label: "B+", cutoff: 87 },
+    { label: "F", cutoff: 0 },
+  ]
+  const grades = [94, 91, 88]
+  const result = getGradeDistribution(grades, scale)
+  assert.deepEqual(result.map(({ label, count }) => [label, count]), [["A", 1], ["A−", 1], ["B+", 1]])
+  assert.equal(result.reduce((total, { count }) => total + count, 0), grades.length)
+  assert.ok(Math.abs(result.reduce((total, { percentage }) => total + percentage, 0) - 100) < 1e-10)
+
+  const boundaries = getGradeDistribution([100, 97, 93, 92.99, 90, 87, 0], scale)
+  assert.deepEqual(boundaries.map(({ count }) => count), [2, 1, 2, 1, 1])
+  assert.deepEqual(getGradeDistribution([], scale), [])
 })
