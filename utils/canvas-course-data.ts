@@ -4,10 +4,8 @@ export type CanvasEnrollment = {
   type?: string
   role?: string
   computed_current_score?: number
-  computed_final_score?: number
   grades?: {
     current_score?: number
-    final_score?: number
   }
 }
 
@@ -43,10 +41,8 @@ export const sanitizeCanvasCourses = (input: unknown): CanvasCourse[] => {
           type: asString(enrollment.type),
           role: asString(enrollment.role),
           computed_current_score: asScore(enrollment.computed_current_score),
-          computed_final_score: asScore(enrollment.computed_final_score),
           grades: {
             current_score: asScore(grades.current_score),
-            final_score: asScore(grades.final_score),
           },
         }
       })
@@ -61,4 +57,10 @@ export const pickStudentEnrollment = (enrollments?: CanvasEnrollment[]): CanvasE
     (enrollment.type ?? "").toLowerCase().includes("student") || (enrollment.role ?? "").toLowerCase().includes("student"),
   )
   return student ?? enrollments.find((enrollment) => !enrollment.type && !enrollment.role)
+}
+
+// Canvas final scores can treat ungraded work as zero. They are not pre-exam grades.
+export const getCanvasCurrentScore = (course: CanvasCourse): number | undefined => {
+  const enrollment = pickStudentEnrollment(course.enrollments)
+  return enrollment?.computed_current_score ?? enrollment?.grades?.current_score
 }

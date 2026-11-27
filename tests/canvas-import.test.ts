@@ -2,6 +2,7 @@ import assert from "node:assert/strict"
 import { test } from "node:test"
 import { onRequestPost } from "../functions/api/canvas/courses"
 import { importCanvasCourses } from "../utils/canvas-api"
+import { getCanvasCurrentScore } from "../utils/canvas-course-data"
 
 const fakeToken = "synthetic-test-token"
 const fakeHost = "school.instructure.com"
@@ -74,4 +75,20 @@ test("when the proxy is unavailable the browser can still import directly", asyn
   })
   assert.equal((await importCanvasCourses(origin, fakeToken)).courses[0].name, "Algebra")
   assert.equal(upstream.mock.callCount(), 2)
+})
+
+
+test("Canvas import ignores final-only scores but preserves a real current zero", async (t) => {
+  t.mock.method(globalThis, "fetch", async () => Response.json({
+    courses: [
+      { id: 1, enrollments: [{ computed_final_score: 76, grades: { final_score: 76, current_score: null } }] },
+      { id: 2, enrollments: [{ computed_current_score: 0, grades: { current_score: 80, final_score: 70 } }] },
+      { id: 3, enrollments: [{ grades: { current_score: "0", final_score: 70 } }] },
+      { id: 4, enrollments: [{ computed_current_score: " ", grades: { current_score: "92" } }] },
+    ],
+  }))
+
+  const { courses } = await importCanvasCourses(origin, fakeToken)
+  assert.deepEqual(courses.map(getCanvasCurrentScore), [undefined, 0, 0, 92])
+  assert.equal(JSON.stringify(courses).includes("final_score"), false)
 })

@@ -68,8 +68,9 @@ import { ShareDialog } from "@/components/share-dialog"
 import { MobileOptimizations, TouchOptimizations } from "@/components/mobile-optimizations"
 import { useLocalStorage } from "@/hooks/use-local-storage"
 import { exportToPdf } from "@/utils/export-utils"
-import { importCanvasCourses, normalizeCanvasBaseUrl, pickStudentEnrollment } from "@/utils/canvas-api"
+import { importCanvasCourses, normalizeCanvasBaseUrl } from "@/utils/canvas-api"
 import { mergeCanvasClasses } from "@/utils/canvas-class-sync"
+import { getCanvasCurrentScore } from "@/utils/canvas-course-data"
 import { validateCanvasBaseUrl } from "@/utils/canvas-urls"
 import {
   applyFinalGradeRounding,
@@ -634,18 +635,10 @@ export default function GradeCalculator() {
 
       const mappedCourses = courses
         .map((course) => {
-          const enrollment = pickStudentEnrollment(course.enrollments)
-          const score =
-            enrollment?.computed_current_score ??
-            enrollment?.grades?.current_score ??
-            enrollment?.computed_final_score ??
-            enrollment?.grades?.final_score
+          const score = getCanvasCurrentScore(course)
+          if (score === undefined) return null
 
-          if (score === undefined || score === null || Number.isNaN(Number(score))) {
-            return null
-          }
-
-          const currentScore = Math.max(0, Math.min(100, Number(score)))
+          const currentScore = Math.max(0, Math.min(100, score))
           const color = colorOptions[Math.abs(course.id) % colorOptions.length]?.value ?? "bg-blue-500"
           const target = getSuggestedTarget(currentScore)
 
@@ -667,7 +660,7 @@ export default function GradeCalculator() {
         .filter(Boolean) as GradeClass[]
 
       if (mappedCourses.length === 0) {
-        setCanvasSyncMessage("No courses with grades were returned. Check that your token has the correct scopes.")
+        setCanvasSyncMessage("Canvas returned no current grades. Saved classes were not changed.")
         setCanvasImportedCount(0)
         return
       }
@@ -677,7 +670,9 @@ export default function GradeCalculator() {
       setCanvasImportedCount(mappedCourses.length)
       const now = new Date().toISOString()
       setLastCanvasSync(now)
-      setCanvasSyncMessage(`Last sync imported ${mappedCourses.length} course${mappedCourses.length === 1 ? "" : "s"}.`)
+      const skipped = courses.length - mappedCourses.length
+      const skippedMessage = skipped > 0 ? ` Skipped ${skipped} without a current grade.` : ""
+      setCanvasSyncMessage(`Last sync imported ${mappedCourses.length} course${mappedCourses.length === 1 ? "" : "s"}.${skippedMessage}`)
       toast({
         title: "Canvas synced",
         description: `Imported ${mappedCourses.length} course${mappedCourses.length === 1 ? "" : "s"} from Canvas.`,
