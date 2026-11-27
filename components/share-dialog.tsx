@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import {
   Dialog,
   DialogContent,
@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Copy, Mail, Share2, CloudIcon } from "lucide-react"
+import { Copy, Mail, Share2 } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
@@ -35,12 +35,13 @@ export function ShareDialog({ data, trigger }: ShareDialogProps) {
   const [activeTab, setActiveTab] = useState("link")
   const [email, setEmail] = useState("")
   const [message, setMessage] = useState("I wanted to share my grade calculator data with you.")
-  const [includeSettings, setIncludeSettings] = useState(true)
+  const [includeSettings, setIncludeSettings] = useState(false)
   const [isSharing, setIsSharing] = useState(false)
   const [shareUrl, setShareUrl] = useState("")
-  useEffect(() => {
+  const handleSettingsChange = (checked: boolean) => {
+    setIncludeSettings(checked)
     setShareUrl("")
-  }, [includeSettings])
+  }
 
   const buildShareUrl = () => {
     const payload = buildSharePayload({
@@ -48,7 +49,7 @@ export function ShareDialog({ data, trigger }: ShareDialogProps) {
       ...(includeSettings && data.settings ? { settings: data.settings } : {}),
     })
     const encoded = encodeShareData(payload)
-    return `${window.location.origin}/shared?data=${encoded}`
+    return `${window.location.origin}/shared#data=${encoded}`
   }
 
   const handleGenerateLink = async () => {
@@ -65,7 +66,7 @@ export function ShareDialog({ data, trigger }: ShareDialogProps) {
       console.error("Error generating link:", error)
       toast({
         title: "Link generation failed",
-        description: "There was an error creating your shareable link. Please try again.",
+        description: error instanceof Error ? error.message : "Try exporting your grades as a file.",
         variant: "destructive",
       })
     } finally {
@@ -73,13 +74,12 @@ export function ShareDialog({ data, trigger }: ShareDialogProps) {
     }
   }
 
-  const handleCopyLink = () => {
-    if (shareUrl) {
-      navigator.clipboard.writeText(shareUrl)
-      toast({
-        title: "Link copied",
-        description: "The shareable link has been copied to your clipboard.",
-      })
+  const handleCopyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(shareUrl)
+      toast({ title: "Link copied" })
+    } catch {
+      toast({ title: "Copy unavailable", description: "Select and copy the link manually." })
     }
   }
 
@@ -89,13 +89,10 @@ export function ShareDialog({ data, trigger }: ShareDialogProps) {
 
       // Open the default email client
       const subject = "Grade Calculator Data"
-      const generatedUrl = shareUrl || buildShareUrl()
-      if (!shareUrl) {
-        setShareUrl(generatedUrl)
-      }
+      const generatedUrl = buildShareUrl()
       const body = `${message}\n\nView my grades here: ${generatedUrl}`
 
-      window.location.href = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
+      window.location.href = `mailto:${encodeURIComponent(email.trim()).replace(/%40/g, "@")}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
 
       toast({
         title: "Email prepared",
@@ -103,6 +100,7 @@ export function ShareDialog({ data, trigger }: ShareDialogProps) {
       })
 
       setOpen(false)
+      setShareUrl("")
     } catch (error) {
       console.error("Error sharing via email:", error)
       toast({
@@ -116,7 +114,7 @@ export function ShareDialog({ data, trigger }: ShareDialogProps) {
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(next) => { setOpen(next); if (!next) setShareUrl("") }}>
       <DialogTrigger asChild>
         {trigger || (
           <Button variant="outline" className="flex items-center gap-2">
@@ -128,11 +126,11 @@ export function ShareDialog({ data, trigger }: ShareDialogProps) {
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>Share Grade Data</DialogTitle>
-          <DialogDescription>Share your grade calculator data via link, email, or cloud storage.</DialogDescription>
+          <DialogDescription>Share a snapshot with a link or through your email app.</DialogDescription>
         </DialogHeader>
 
         <Tabs defaultValue="link" value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid grid-cols-3 mb-4">
+          <TabsList className="grid grid-cols-2 mb-4">
             <TabsTrigger value="link" className="flex items-center gap-1">
               <Copy className="h-4 w-4" />
               Link
@@ -141,22 +139,18 @@ export function ShareDialog({ data, trigger }: ShareDialogProps) {
               <Mail className="h-4 w-4" />
               Email
             </TabsTrigger>
-            <TabsTrigger value="cloud" className="flex items-center gap-1">
-              <CloudIcon className="h-4 w-4" />
-              Cloud
-            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="link" className="space-y-4">
             <p className="text-xs text-muted-foreground">
-              Share links include your data directly in the URL. Only send them to people you trust.
+              Anyone with the link can read your class names and grades. Assignment details and Canvas identifiers are not included.
             </p>
             <div className="space-y-2">
               <div className="flex items-center space-x-2">
                 <Checkbox
                   id="include-settings-link"
                   checked={includeSettings}
-                  onCheckedChange={(checked) => setIncludeSettings(!!checked)}
+                  onCheckedChange={(checked) => handleSettingsChange(!!checked)}
                 />
                 <Label htmlFor="include-settings-link" className="cursor-pointer">
                   Include settings in shared data
@@ -169,7 +163,7 @@ export function ShareDialog({ data, trigger }: ShareDialogProps) {
                 <Label htmlFor="share-url">Shareable Link</Label>
                 <div className="flex gap-2">
                   <Input id="share-url" value={shareUrl} readOnly className="flex-1" />
-                  <Button onClick={handleCopyLink} size="sm">
+                  <Button onClick={handleCopyLink} size="sm" aria-label="Copy shareable link">
                     <Copy className="h-4 w-4" />
                   </Button>
                 </div>
@@ -183,7 +177,7 @@ export function ShareDialog({ data, trigger }: ShareDialogProps) {
 
           <TabsContent value="email" className="space-y-4">
             <p className="text-xs text-muted-foreground">
-              We will open your email client with a share link that includes your data.
+              This opens your email app. Anyone with the link can read the class names and grades.
             </p>
             <div className="space-y-2">
               <Label htmlFor="email">Recipient Email</Label>
@@ -210,7 +204,7 @@ export function ShareDialog({ data, trigger }: ShareDialogProps) {
               <Checkbox
                 id="include-settings-email"
                 checked={includeSettings}
-                onCheckedChange={(checked) => setIncludeSettings(!!checked)}
+                onCheckedChange={(checked) => handleSettingsChange(!!checked)}
               />
               <Label htmlFor="include-settings-email" className="cursor-pointer">
                 Include settings in shared data
@@ -222,15 +216,10 @@ export function ShareDialog({ data, trigger }: ShareDialogProps) {
             </Button>
           </TabsContent>
 
-          <TabsContent value="cloud" className="space-y-4">
-            <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
-              Cloud integrations are not configured yet. Use a share link or export from the calculator instead.
-            </div>
-          </TabsContent>
         </Tabs>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)}>
+          <Button variant="outline" onClick={() => { setOpen(false); setShareUrl("") }}>
             Close
           </Button>
         </DialogFooter>

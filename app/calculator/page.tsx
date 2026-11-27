@@ -15,6 +15,11 @@ export const metadata: Metadata = {
   },
 }
 
+const gradeExample = {
+  question: "How does grade rounding change the score I need on my final?",
+  answer: "With a 92.50% current grade, a final worth 20%, and a 93% cutoff for an A, you need 95.00% on the exam if rounding is off. If your school rounds the overall course grade to the nearest whole percent, 92.50% rounds to 93%, so you need 92.50% on the exam. Match the calculator’s rounding setting to your school’s policy.",
+}
+
 const jsonLd = {
   '@context': 'https://schema.org',
   '@graph': [
@@ -79,10 +84,10 @@ const jsonLd = {
       mainEntity: [
         {
           '@type': 'Question',
-          name: 'What grade do I need on my final exam?',
+          name: gradeExample.question,
           acceptedAnswer: {
             '@type': 'Answer',
-            text: 'Enter your current grade, target grade, and the exam\'s weight to instantly see the score you need. The formula is: Required Score = (Target Grade − Current Grade × (1 − Final Weight/100)) ÷ (Final Weight/100). For example, if you have a 78%, want an 85%, and the final is worth 30%, you need an 82% on the final.',
+            text: gradeExample.answer,
           },
         },
         {
@@ -198,23 +203,16 @@ export default function CalculatorPage() {
           <section aria-labelledby="formula-heading">
             <h2 id="formula-heading" className="text-2xl font-bold mb-6">The Final Exam Grade Formula</h2>
             <div className="space-y-4 text-muted-foreground">
-              <p>The calculation behind this tool uses a straightforward weighted average formula:</p>
+              <p>Use the minimum unrounded course grade that meets your goal as the target in this formula.</p>
               <div className="glass-card rounded-xl p-6 font-mono text-sm overflow-x-auto">
                 <p className="font-semibold text-foreground mb-2">Required Score = (Target Grade − Current Grade × (1 − Final Weight / 100)) ÷ (Final Weight / 100)</p>
               </div>
-              <p><strong>Worked example:</strong> You currently have a <strong>78%</strong> in a class. You want to finish with at least an <strong>85%</strong>. The final exam is worth <strong>30%</strong> of your grade.</p>
-              <div className="glass-card rounded-xl p-6 font-mono text-sm overflow-x-auto space-y-1">
-                <p>Required Score = (85 − 78 × (1 − 30/100)) ÷ (30/100)</p>
-                <p>Required Score = (85 − 78 × 0.70) ÷ 0.30</p>
-                <p>Required Score = (85 − 54.6) ÷ 0.30</p>
-                <p>Required Score = 30.4 ÷ 0.30</p>
-                <p className="font-semibold text-foreground">Required Score = <strong>101.3%</strong></p>
+              <p><strong>Worked example:</strong> You have a <strong>92.50%</strong> current grade, your final is worth <strong>20%</strong>, and an A starts at <strong>93%</strong>. Your current work contributes 92.50 × 0.80 = 74.00 percentage points.</p>
+              <div className="glass-card rounded-xl p-6 font-mono text-sm overflow-x-auto space-y-2">
+                <p>Rounding off: (93.00 − 74.00) ÷ 0.20 = <strong>95.00%</strong> on the exam</p>
+                <p>Whole-grade rounding on: (92.50 − 74.00) ÷ 0.20 = <strong>92.50%</strong> on the exam</p>
               </div>
-              <p>
-                In this case, a 101.3% is mathematically impossible — meaning you cannot reach an 85% no matter what you score on the final.
-                You&apos;d need to lower your target to something achievable given your current standing.
-                If your required score comes out under 100%, you have a clear, reachable goal.
-              </p>
+              <p>Whole-grade rounding applies to your overall course grade, not the exam score. Check your syllabus to see which setting to use.</p>
             </div>
           </section>
 
@@ -256,6 +254,11 @@ export default function CalculatorPage() {
             <div className="space-y-6">
 
               <div className="glass-card rounded-xl p-6">
+                <h3 className="font-semibold text-lg mb-2">{gradeExample.question}</h3>
+                <p className="text-muted-foreground">{gradeExample.answer}</p>
+              </div>
+
+              <div className="glass-card rounded-xl p-6">
                 <h3 className="font-semibold text-lg mb-2">What grade do I need on my final to pass the class?</h3>
                 <p className="text-muted-foreground">Set your target grade to 60% (or whatever the minimum passing grade is at your school) and enter your current grade and final exam weight. The calculator will show the minimum score you need to pass. If the required score is over 100%, passing is no longer mathematically possible given your current grade.</p>
               </div>
@@ -282,12 +285,12 @@ export default function CalculatorPage() {
 
               <div className="glass-card rounded-xl p-6">
                 <h3 className="font-semibold text-lg mb-2">Does FinalsCalc work with Canvas, Blackboard, or other LMS platforms?</h3>
-                <p className="text-muted-foreground">FinalsCalc has a Canvas LMS integration that can import your current grades directly, so you don&apos;t have to manually enter them. For other platforms (Blackboard, Moodle, D2L), you can manually copy your current grade percentage from the gradebook into the calculator.</p>
+                <p className="text-muted-foreground">FinalsCalc has a Canvas LMS integration that can import your current grades, so you don&apos;t have to manually enter them. For other platforms (Blackboard, Moodle, D2L), you can manually copy your current grade percentage from the gradebook into the calculator.</p>
               </div>
 
               <div className="glass-card rounded-xl p-6">
                 <h3 className="font-semibold text-lg mb-2">Is my grade data saved or shared?</h3>
-                <p className="text-muted-foreground">All your data is stored locally in your browser using localStorage — nothing is sent to any server. Your grade information is completely private and only accessible on your device. You can also use the share feature to generate an encoded link if you want to share your setup with someone else.</p>
+                <p className="text-muted-foreground">Manual grade calculations run in your browser, where your calculator settings and grades are saved. If you use Canvas Sync, the import proxy receives your Canvas domain and token to retrieve course names and grades from Canvas. Share links contain your calculator setup, so only send them to people you want to see it.</p>
               </div>
 
               <div className="glass-card rounded-xl p-6">

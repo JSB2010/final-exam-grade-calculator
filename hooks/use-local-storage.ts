@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useCallback, useRef, type Dispatch, type SetStateAction } from "react"
 
 type LocalStorageOptions<T> = {
   parse?: (value: unknown, fallback: T) => T
@@ -11,7 +11,7 @@ export function useLocalStorage<T>(
   key: string,
   initialValue: T,
   options?: LocalStorageOptions<T>,
-): [T, (value: T) => void] {
+): [T, Dispatch<SetStateAction<T>>] {
   // Create a state variable to track if we're mounted
   const [mounted, setMounted] = useState(false)
 
@@ -57,7 +57,7 @@ export function useLocalStorage<T>(
 
   // Return a wrapped version of useState's setter function that
   // persists the new value to localStorage.
-  const setValue = useCallback((value: T) => {
+  const setValue = useCallback((value: SetStateAction<T>) => {
     try {
       // Allow value to be a function so we have same API as useState
       const valueToStore = value instanceof Function ? value(valueRef.current) : value

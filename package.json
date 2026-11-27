@@ -18,15 +18,15 @@
   ],
   "private": true,
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=20.9.0"
   },
   "packageManager": "npm@11.3.0",
   "scripts": {
     "dev": "next dev --turbopack",
     "dev:default": "next dev",
     "build": "next build",
-    "start": "next start",
-    "lint": "next lint"
+    "test": "node --import ./scripts/register-test-typescript.mjs --test tests/*.test.mjs tests/*.test.ts",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@emotion/is-prop-valid": "latest",

@@ -19,7 +19,7 @@ export function UnifiedFooter() {
             </Link>
           </div>
           <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4 mt-4 md:mt-0">
-            <jb-credit data-variant="prominent" />
+            <a href="https://jacobbarkin.com" className="text-sm text-muted-foreground hover:text-primary hover:underline">Built by Jacob Barkin</a>
             <div className="flex items-center gap-2">
               <span className="text-muted-foreground">•</span>
               <a

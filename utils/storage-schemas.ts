@@ -17,7 +17,7 @@ const gradeClassSchema = z.object({
   name: z.string(),
   current: z.coerce.number(),
   weight: z.coerce.number(),
-  target: z.string(),
+  target: z.string().transform((label) => /^[A-F]-$/.test(label) ? label[0] + "−" : label),
   assignments: z.array(assignmentSchema).default([]),
   color: z.string(),
   credits: z.coerce.number().optional(),
@@ -134,3 +134,17 @@ export const parseSharePayload = (raw: unknown) => {
 }
 
 export const STORAGE_VERSION_NUMBER = STORAGE_VERSION
+
+const backupSchema = z.object({
+  classes: gradeClassesSchema,
+  settings: appSettingsSchema.optional(),
+})
+
+export const parseGradeBackup = (raw: unknown) => {
+  const result = backupSchema.safeParse(Array.isArray(raw) ? { classes: raw } : raw)
+  if (!result.success) return null
+  const { classes } = result.data
+  if (new Set(classes.map((cls) => cls.id)).size !== classes.length ||
+      classes.some((cls) => cls.weight < 0 || cls.weight > 100 || !cls.id)) return null
+  return result.data
+}

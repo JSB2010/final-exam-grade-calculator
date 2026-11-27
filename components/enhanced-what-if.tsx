@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Calculator, TrendingUp, Target, BarChart3, Lightbulb, Zap } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { calculateFinalGrade, calculateRequiredScore } from "@/utils/grade-math"
+import { applyFinalGradeRounding, calculateFinalGrade, calculateRequiredScore, getGradeBand } from "@/utils/grade-math"
 
 interface GradeClass {
   id: string
@@ -17,6 +17,7 @@ interface GradeClass {
   current: number
   weight: number
   target: string
+  color: string
   credits?: number
 }
 
@@ -26,13 +27,29 @@ interface GradeBand {
   color: string
 }
 
+type BaseScenario = {
+  description: string
+  requiredScore: number
+  currentProjection: number
+  achievable: boolean
+  difficulty: string
+}
+
+type Scenario = BaseScenario & (
+  | { type: "Target Achievement" | "Grade Improvement" }
+  | { type: "Risk Assessment"; gradeBand?: string; risk: string }
+)
+
 interface EnhancedWhatIfProps {
   classes: GradeClass[]
   gradeBands: GradeBand[]
+  roundToWhole: boolean
   formatGrade: (grade: number) => string
+  formatFinalGrade: (grade: number) => string
+  formatExamRequirement: (score: number) => string
 }
 
-export default function EnhancedWhatIf({ classes, gradeBands, formatGrade }: Readonly<EnhancedWhatIfProps>) {
+export default function EnhancedWhatIf({ classes, gradeBands, roundToWhole, formatGrade, formatFinalGrade, formatExamRequirement }: Readonly<EnhancedWhatIfProps>) {
   const [selectedClassId, setSelectedClassId] = useState<string>(classes[0]?.id || "")
   const [targetGrade, setTargetGrade] = useState<string>("A")
   const [currentGradeAdjustment, setCurrentGradeAdjustment] = useState<number>(0)
@@ -41,17 +58,8 @@ export default function EnhancedWhatIf({ classes, gradeBands, formatGrade }: Rea
 
   const selectedClass = classes.find(cls => cls.id === selectedClassId)
 
-  const getCurrentGradeBand = (grade: number) => {
-    for (const band of gradeBands) {
-      if (grade >= band.cutoff) {
-        return band
-      }
-    }
-    return gradeBands[gradeBands.length - 1]
-  }
-
   const getDifficulty = (score: number) => {
-    if (!Number.isFinite(score)) return "N/A"
+    if (!Number.isFinite(score) || score > 100) return "N/A"
     if (score > 95) return "Very Hard"
     if (score > 85) return "Hard"
     if (score > 70) return "Moderate"
@@ -70,26 +78,23 @@ export default function EnhancedWhatIf({ classes, gradeBands, formatGrade }: Rea
     return "default"
   }
 
-  const scenarios = useMemo(() => {
+  const scenarios = useMemo<Scenario[]>(() => {
     if (!selectedClass) return []
 
-    const adjustedCurrent = selectedClass.current + currentGradeAdjustment
+    const adjustedCurrent = Math.max(0, Math.min(100, selectedClass.current + currentGradeAdjustment))
+    const roundOptions = { roundToWhole }
 
     switch (scenarioType) {
       case "target": {
         const targetBand = gradeBands.find(band => band.label === targetGrade)
         if (!targetBand) return []
 
-        const requiredScore = calculateRequiredScore(adjustedCurrent, selectedClass.weight, targetBand.cutoff)
+        const requiredScore = calculateRequiredScore(adjustedCurrent, selectedClass.weight, targetBand.cutoff, roundOptions)
         const finalGrade = calculateFinalGrade(adjustedCurrent, selectedClass.weight, finalExamScore)
-        const clampedRequired = Number.isFinite(requiredScore)
-          ? Math.max(0, Math.min(100, requiredScore))
-          : requiredScore
-
         return [{
           type: "Target Achievement",
           description: `To achieve ${targetGrade} (${targetBand.cutoff}%+)`,
-          requiredScore: clampedRequired,
+          requiredScore: Math.max(0, requiredScore),
           currentProjection: finalGrade,
           achievable: Number.isFinite(requiredScore) ? requiredScore <= 100 : false,
           difficulty: getDifficulty(requiredScore)
@@ -102,14 +107,11 @@ export default function EnhancedWhatIf({ classes, gradeBands, formatGrade }: Rea
 
         return improvementLevels.map(improvement => {
           const targetScore = adjustedCurrent + improvement
-          const requiredScore = calculateRequiredScore(adjustedCurrent, selectedClass.weight, targetScore)
-          const clampedRequired = Number.isFinite(requiredScore)
-            ? Math.max(0, Math.min(100, requiredScore))
-            : requiredScore
+          const requiredScore = calculateRequiredScore(adjustedCurrent, selectedClass.weight, targetScore, roundOptions)
           return {
             type: "Grade Improvement",
             description: `Improve by ${improvement} points to ${formatGrade(targetScore)}%`,
-            requiredScore: clampedRequired,
+            requiredScore: Math.max(0, requiredScore),
             currentProjection: calculateFinalGrade(adjustedCurrent, selectedClass.weight, finalExamScore),
             achievable: Number.isFinite(requiredScore) ? requiredScore <= 100 : false,
             difficulty: getDifficulty(requiredScore)
@@ -121,7 +123,8 @@ export default function EnhancedWhatIf({ classes, gradeBands, formatGrade }: Rea
         const riskScores = [0, 30, 50, 70]
         return riskScores.map(score => {
           const finalGrade = calculateFinalGrade(adjustedCurrent, selectedClass.weight, score)
-          const gradeBand = getCurrentGradeBand(finalGrade)
+          const roundedFinalGrade = applyFinalGradeRounding(finalGrade, roundOptions)
+          const gradeBand = getGradeBand(roundedFinalGrade, gradeBands)
           return {
             type: "Risk Assessment",
             description: `If you score ${score}% on final`,
@@ -129,8 +132,8 @@ export default function EnhancedWhatIf({ classes, gradeBands, formatGrade }: Rea
             currentProjection: finalGrade,
             achievable: true,
             difficulty: "N/A",
-            gradeBand: gradeBand.label,
-            risk: getRiskLevel(finalGrade)
+            gradeBand: gradeBand?.label,
+            risk: getRiskLevel(roundedFinalGrade)
           }
         })
       }
@@ -138,9 +141,9 @@ export default function EnhancedWhatIf({ classes, gradeBands, formatGrade }: Rea
       default:
         return []
     }
-  }, [selectedClass, targetGrade, currentGradeAdjustment, finalExamScore, scenarioType, gradeBands, formatGrade])
+  }, [selectedClass, targetGrade, currentGradeAdjustment, finalExamScore, scenarioType, gradeBands, roundToWhole, formatGrade])
 
-  const getScenarioColor = (scenario: any) => {
+  const getScenarioColor = (scenario: Scenario) => {
     if (scenario.type === "Risk Assessment") {
       if (scenario.risk === "High Risk") return "bg-red-100 border-red-300 dark:bg-red-900/20"
       if (scenario.risk === "Medium Risk") return "bg-amber-100 border-amber-300 dark:bg-amber-900/20"
@@ -156,7 +159,7 @@ export default function EnhancedWhatIf({ classes, gradeBands, formatGrade }: Rea
 
   const formatRequiredScore = (score: number, achievable: boolean) => {
     if (!Number.isFinite(score)) return "No final"
-    return achievable ? `${formatGrade(score)}%` : "Impossible"
+    return achievable ? `${formatExamRequirement(score)}%` : `Impossible (needs ${formatExamRequirement(score)}%)`
   }
 
   const getDifficultyIcon = (difficulty: string) => {
@@ -413,7 +416,7 @@ export default function EnhancedWhatIf({ classes, gradeBands, formatGrade }: Rea
                   <>
                     <div className="flex justify-between">
                       <span className="text-sm">Final Grade:</span>
-                      <span className="font-medium">{formatGrade(scenario.currentProjection)}%</span>
+                      <span className="font-medium">{formatFinalGrade(scenario.currentProjection)}%</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-sm">Letter Grade:</span>
@@ -440,7 +443,7 @@ export default function EnhancedWhatIf({ classes, gradeBands, formatGrade }: Rea
                     </div>
                     <div className="flex justify-between">
                       <span className="text-sm">Projected Grade:</span>
-                      <span className="font-medium">{formatGrade(scenario.currentProjection)}%</span>
+                      <span className="font-medium">{formatFinalGrade(scenario.currentProjection)}%</span>
                     </div>
                   </>
                 )}

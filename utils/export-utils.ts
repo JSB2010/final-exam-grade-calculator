@@ -1,5 +1,6 @@
 import { jsPDF } from "jspdf"
 import html2canvas from "html2canvas"
+import { buildCsv } from "./csv"
 
 export type ExportFormat = "pdf" | "csv" | "png" | "json"
 
@@ -24,25 +25,8 @@ export const exportToJson = (data: any, filename = "export.json") => {
 }
 
 // Export data to CSV
-export const exportToCsv = (data: any[], filename = "export.csv") => {
-  // Convert object array to CSV string
-  const headers = Object.keys(data[0])
-  const csvRows = []
-
-  // Add headers
-  csvRows.push(headers.join(","))
-
-  // Add rows
-  for (const row of data) {
-    const values = headers.map((header) => {
-      const value = row[header]
-      // Handle strings with commas by wrapping in quotes
-      return typeof value === "string" && value.includes(",") ? `"${value}"` : value
-    })
-    csvRows.push(values.join(","))
-  }
-
-  const csvString = csvRows.join("\n")
+export const exportToCsv = (data: Record<string, unknown>[], filename = "export.csv", headers?: string[]) => {
+  const csvString = buildCsv(data, headers)
   const dataUri = `data:text/csv;charset=utf-8,${encodeURIComponent(csvString)}`
 
   const exportFilename = filename.endsWith(".csv") ? filename : `${filename}.csv`
@@ -75,7 +59,7 @@ export const captureElementImage = async (
 
 // Export element to PDF
 export const exportToPdf = async (element: HTMLElement, options: ExportOptions = {}): Promise<void> => {
-  const { filename = "export.pdf", title = "Export", includeDetails = true } = options
+  const { filename = "export.pdf", title = "Export" } = options
 
   try {
     // Create a new jsPDF instance
@@ -97,12 +81,23 @@ export const exportToPdf = async (element: HTMLElement, options: ExportOptions =
       allowTaint: true,
     })
 
-    const imgData = canvas.toDataURL("image/png")
-    const imgWidth = 180
-    const imgHeight = (canvas.height * imgWidth) / canvas.width
-
-    // Add the image to the PDF
-    pdf.addImage(imgData, "PNG", 15, 25, imgWidth, imgHeight)
+    const width = pdf.internal.pageSize.getWidth() - 30
+    const pageHeight = pdf.internal.pageSize.getHeight()
+    const scale = width / canvas.width
+    let y = 0
+    while (y < canvas.height) {
+      const top = y === 0 ? 25 : 15
+      const height = Math.min(canvas.height - y, Math.floor((pageHeight - top - 15) / scale))
+      const pageCanvas = document.createElement("canvas")
+      pageCanvas.width = canvas.width
+      pageCanvas.height = height
+      const context = pageCanvas.getContext("2d")
+      if (!context) throw new Error("Unable to prepare a PDF page.")
+      context.drawImage(canvas, 0, y, canvas.width, height, 0, 0, canvas.width, height)
+      if (y > 0) pdf.addPage()
+      pdf.addImage(pageCanvas.toDataURL("image/png"), "PNG", 15, top, width, height * scale)
+      y += height
+    }
 
     // Save the PDF
     pdf.save(filename.endsWith(".pdf") ? filename : `${filename}.pdf`)
@@ -124,12 +119,17 @@ export const exportToPng = async (element: HTMLElement, options: ExportOptions =
       allowTaint: true,
     })
 
-    const dataUrl = canvas.toDataURL("image/png")
-
+    const image = await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error("Unable to render the PNG.")), "image/png")
+    })
+    const url = URL.createObjectURL(image)
     const linkElement = document.createElement("a")
-    linkElement.setAttribute("href", dataUrl)
-    linkElement.setAttribute("download", filename.endsWith(".png") ? filename : `${filename}.png`)
+    linkElement.href = url
+    linkElement.download = filename.endsWith(".png") ? filename : `${filename}.png`
+    document.body.appendChild(linkElement)
     linkElement.click()
+    linkElement.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 30_000)
   } catch (error) {
     console.error("Error exporting to PNG:", error)
     throw error

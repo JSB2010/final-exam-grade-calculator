@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { BarChart3, TrendingUp, Target, Award, AlertTriangle, Calculator } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { getGradeBand, getGradeDistribution } from "@/utils/grade-math"
 
 interface GradeClass {
   id: string
@@ -13,6 +13,7 @@ interface GradeClass {
   current: number
   weight: number
   target: string
+  color: string
   credits?: number
 }
 
@@ -55,18 +56,7 @@ export default function GradeStatistics({ classes, gradeBands, formatGrade }: Gr
       ? grades.reduce((sum, grade, index) => sum + grade * weights[index], 0) / totalWeight
       : mean
 
-    // Grade distribution
-    const distribution = gradeBands.map(band => {
-      const count = grades.filter(grade => {
-        const nextBand = gradeBands.find(b => b.cutoff > band.cutoff)
-        return grade >= band.cutoff && (nextBand ? grade < nextBand.cutoff : true)
-      }).length
-      return {
-        ...band,
-        count,
-        percentage: (count / grades.length) * 100
-      }
-    }).filter(band => band.count > 0)
+    const distribution = getGradeDistribution(grades, gradeBands)
 
     // Risk analysis
     const atRiskClasses = classes.filter(cls => cls.current < 70).length
@@ -78,7 +68,8 @@ export default function GradeStatistics({ classes, gradeBands, formatGrade }: Gr
       const targetBand = gradeBands.find(band => band.label === cls.target)
       if (!targetBand) return null
 
-      const currentBand = gradeBands.find(band => cls.current >= band.cutoff) || gradeBands[gradeBands.length - 1]
+      const currentBand = getGradeBand(cls.current, gradeBands)
+      if (!currentBand) return null
       const isOnTrack = cls.current >= targetBand.cutoff
       const gap = targetBand.cutoff - cls.current
 
@@ -222,7 +213,7 @@ export default function GradeStatistics({ classes, gradeBands, formatGrade }: Gr
                     <span className="text-sm text-muted-foreground">({band.cutoff}%+)</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-sm">{band.count} classes</span>
+                    <span className="text-sm">{band.count} {band.count === 1 ? "class" : "classes"}</span>
                     <Badge variant="outline">{formatGrade(band.percentage)}%</Badge>
                   </div>
                 </div>
